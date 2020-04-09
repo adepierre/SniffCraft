@@ -12,7 +12,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Compression is supported
 
 Here is an example of a captured session:
-```json
+```javascript
 [0:0:6:6817] [S --> C] Time Update
 [0:0:6:6868] [S --> C] Destroy Entities
 [0:0:7:7149] [C --> S] Player Block Placement
