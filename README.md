@@ -72,7 +72,7 @@ Once built, you can start SniffCraft with the following command line:
 sniffcraft listening_port server_ip server_port logconf_filepath
 ```
 
-logconf_filepath is an optional json file, and can be used to filter out the packets. With the default configuration, only the names of the packets are logged. When a packet is added to an ignored list, it won't appear in the logs, when it's in a detail list, its full content will be logged. Packets can be added either by id or by name (as registered in protocolCraft), but as id can vary from one version to another, using names is safer.
+logconf_filepath is an optional json file, and can be used to filter out the packets. Examples can be found in the [conf](conf/) directory. With the default configuration, only the names of the packets are logged. When a packet is added to an ignored list, it won't appear in the logs, when it's in a detail list, its full content will be logged. Packets can be added either by id or by name (as registered in protocolCraft), but as id can vary from one version to another, using names is safer.
 
 server_ip and server_port should match the address of the server you want to connect to. You can then connect your official minecraft client to SniffCraft as if it were a regular server. If you are running SniffCraft on the same computer as your client, something as 127.0.0.1:listening_port should work.
 
