@@ -1,0 +1,73 @@
+{
+    "Handshaking": {
+        "ignored_clientbound" : [
+            
+        ],
+        "ignored_serverbound" : [
+            
+        ],
+        "detailed_clientbound": [
+            
+        ],
+        "detailed_serverbound": [
+            
+        ]
+    },
+    "Status": {
+        "ignored_clientbound" : [
+            
+        ],
+        "ignored_serverbound" : [
+            
+        ],
+        "detailed_clientbound": [
+            
+        ],
+        "detailed_serverbound": [
+            
+        ]
+    },
+    "Login": {
+        "ignored_clientbound" : [
+            
+        ],
+        "ignored_serverbound" : [
+            
+        ],
+        "detailed_clientbound": [
+            
+        ],
+        "detailed_serverbound": [
+            
+        ]
+    },
+    "Play": {
+        "ignored_clientbound" : [
+            "Entity Relative Move",
+            "Entity Look And Relative Move",
+            "Player Position And Look (clientbound)",
+            "Entity Head Look",
+            "Chunk Data",
+            "Unload Chunk",
+            "Entity Metadata",
+            "Entity Properties",
+            "Spawn Mob",
+            "Entity Velocity",
+            "Entity Teleport",
+            "Entity Equipment",
+            "Spawn Object"
+            
+        ],
+        "ignored_serverbound" : [
+            "Player Look",
+            "Player Position And Look (serverbound)",
+            "Player Position"
+        ],
+        "detailed_clientbound": [
+            
+        ],
+        "detailed_serverbound": [
+            
+        ]
+    }
+}

@@ -1,0 +1,1 @@
+set(PICOJSON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/3rdparty/picoJson/include)
