@@ -34,8 +34,3 @@ int main(int argc, char* argv[])
 
    return 0;
 }
-
-/*
- * [Note] On posix systems the tcp proxy server build command is as follows:
- * c++ -pedantic -ansi -Wall -Werror -O3 -o tcpproxy_server tcpproxy_server.cpp -L/usr/lib -lstdc++ -lpthread -lboost_thread -lboost_system
- */
