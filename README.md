@@ -7,7 +7,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features and limitations
 
-- Supported minecraft versions: 1.12.2, 1.13, 1.13.1, 1.13.2, 1.14, 1.14.1, 1.14.2, 1.14.3, 1.14.4, 1.15, 1.15.1, 1.15.2
+- Supported minecraft versions: 1.12.2, 1.13, 1.13.1, 1.13.2, 1.14, 1.14.1, 1.14.2, 1.14.3, 1.14.4, 1.15, 1.15.1, 1.15.2, 1.16, 1.16.1
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 
@@ -54,13 +54,13 @@ You don't have to install any dependency to build SniffCraft, everything that is
 
 ## Building and launch
 
-To build for game version 1.15.2:
+To build for game version 1.16.1:
 ```
 git clone https://github.com/adepierre/SniffCraft.git
 cd sniffcraft
 mkdir build
 cd build
-cmake -DGAME_VERSION=1.15.2 ..
+cmake -DGAME_VERSION=1.16.1 ..
 make all
 ```
 
