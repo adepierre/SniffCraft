@@ -74,11 +74,19 @@ void Logger::LogConsume()
             auto min = std::chrono::duration_cast<std::chrono::minutes>(item.date - start_time).count();
             auto hours = std::chrono::duration_cast<std::chrono::hours>(item.date - start_time).count();
 
+            std::stringstream output;
+
             if (item.msg == nullptr)
             {
-                log_file << "[" << hours << ":" << min << ":" << sec << ":" << milisec << "] "
+                output << "[" << hours << ":" << min << ":" << sec << ":" << milisec << "] "
                     << (item.origin == Origin::Server ? "[S --> C] " : "[C --> S] ");
-                log_file << "UNKNOWN OR WRONGLY PARSED MESSAGE" << std::endl;
+                output << "UNKNOWN OR WRONGLY PARSED MESSAGE";
+                const std::string output_str = output.str();
+                log_file << output_str << std::endl;
+                if (log_to_console)
+                {
+                    std::cout << output_str << std::endl;
+                }
                 return;
             }
 
@@ -92,12 +100,19 @@ void Logger::LogConsume()
             const std::set<int>& detailed_set = detailed_packets[{item.connection_state, item.origin}];
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
 
-            log_file << "[" << hours << ":" << min << ":" << sec << ":" << milisec << "] "
+            output << "[" << hours << ":" << min << ":" << sec << ":" << milisec << "] "
                 << (item.origin == Origin::Server ? "[S --> C] " : "[C --> S] ");
-            log_file << item.msg->GetName() << std::endl;
+            output << item.msg->GetName();
             if (is_detailed)
             {
-                log_file << item.msg->Serialize().serialize(true) << std::endl;
+                output << "\n" << item.msg->Serialize().serialize(true);
+            }
+
+            const std::string output_str = output.str();
+            log_file << output_str << std::endl;
+            if (log_to_console)
+            {
+                std::cout << output_str << std::endl;
             }
 
             // Every 5 seconds, check if the conf file has changed and reload it if needed
@@ -176,6 +191,17 @@ void Logger::LoadConfig(const std::string& path)
     };
 
     const picojson::value::object& obj = json.get<picojson::object>();
+
+    log_to_console = false;
+    auto log_to_console_value = obj.find("LogToConsole");
+    if (log_to_console_value == obj.end())
+    {
+        log_to_console = false;
+    }
+    else
+    {
+        log_to_console = log_to_console_value->second.get<bool>();
+    }
 
     for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
     {

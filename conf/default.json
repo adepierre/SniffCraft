@@ -1,4 +1,5 @@
 {
+    "LogToConsole": false,
     "Handshaking": {
         "ignored_clientbound" : [
         

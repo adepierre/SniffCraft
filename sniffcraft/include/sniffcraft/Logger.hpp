@@ -48,6 +48,7 @@ private:
     std::string logfile_path;
     std::ofstream log_file;
     bool is_running;
+    bool log_to_console;
 
     std::time_t last_time_checked_log_file;
     std::time_t last_time_log_file_modified;

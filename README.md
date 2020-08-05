@@ -11,6 +11,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 - Configuration (which packet to log/ignore) can be changed without restarting
+- Automatically create a session file to log information, can also optionally log to console at the same time
 
 Here is an example of a captured session:
 ```javascript
