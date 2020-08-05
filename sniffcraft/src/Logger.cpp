@@ -4,10 +4,12 @@
 #include <iomanip>
 
 #include <protocolCraft/MessageFactory.hpp>
+#include <sniffcraft/FileUtilities.hpp>
 
 Logger::Logger(const std::string &conf_path)
 {
-    LoadConfig(conf_path);
+    logfile_path = conf_path;
+    LoadConfig(logfile_path);
 
     is_running = true;
     log_thread = std::thread(&Logger::LogConsume, this);
@@ -97,12 +99,29 @@ void Logger::LogConsume()
             {
                 log_file << item.msg->Serialize().serialize(true) << std::endl;
             }
+
+            // Every 5 seconds, check if the conf file has changed and reload it if needed
+            std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            if (now - last_time_checked_log_file > 5)
+            {
+                last_time_checked_log_file = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                LoadConfig(logfile_path);
+            }
         }
     }
 }
 
 void Logger::LoadConfig(const std::string& path)
 {
+    std::time_t modification_time = GetModifiedTimestamp(path);
+    if (modification_time == -1 ||
+        modification_time == last_time_log_file_modified)
+    {
+        return;
+    }
+
+    last_time_log_file_modified = modification_time;
+
     std::stringstream ss;
     std::ifstream file;
 
@@ -114,7 +133,7 @@ void Logger::LoadConfig(const std::string& path)
         file.open(path);
         if (!file.is_open())
         {
-            std::cerr << "Error trying to open conf file: " << path << ". Using default conf instead" << std::endl;
+            std::cerr << "Error trying to open conf file: " << path << "." << std::endl;
             error = true;
         }
         if (!error)
@@ -127,16 +146,15 @@ void Logger::LoadConfig(const std::string& path)
 
             if (!err.empty())
             {
-                std::cerr << "Error parsing conf file at " << path << "\n";
-                std::cerr << err << "\n";
-                std::cerr << "Using default conf instead." << std::endl;
+                std::cerr << "Error parsing conf file at " << path << ".\n";
+                std::cerr << err << "\n" << std::endl;
                 error = true;
             }
             if (!error)
             {
                 if (!json.is<picojson::object>())
                 {
-                    std::cerr << "Error parsing conf file at " << path << ". Using default conf instead." << std::endl;
+                    std::cerr << "Error parsing conf file at " << path << "." << std::endl;
                     error = true;
                 }
             }
@@ -146,11 +164,6 @@ void Logger::LoadConfig(const std::string& path)
     //Create default conf
     if (error)
     {
-        ss = std::stringstream("{\"Handshaking\":{\"ignored_clientbound\":[],\"ignored_serverbound\":[],\"detailed_clientbound\":[], \"detailed_serverbound\":[]},"
-            "\"Status\":{\"ignored_clientbound\":[],\"ignored_serverbound\":[],\"detailed_clientbound\":[], \"detailed_serverbound\":[]},"
-            "\"Login\":{\"ignored_clientbound\":[],\"ignored_serverbound\":[],\"detailed_clientbound\":[], \"detailed_serverbound\":[]},"
-            "\"Play\":{\"ignored_clientbound\":[],\"ignored_serverbound\":[],\"detailed_clientbound\":[], \"detailed_serverbound\":[]}}");
-        ss >> json;
         return;
     }
 

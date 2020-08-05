@@ -3,6 +3,7 @@ project(sniffcraft)
 set(sniffcraft_PUBLIC_HDR 
     include/sniffcraft/Compression.hpp
     include/sniffcraft/enums.hpp
+    include/sniffcraft/FileUtilities.hpp
     include/sniffcraft/Handler.hpp
     include/sniffcraft/Logger.hpp
     include/sniffcraft/MinecraftProxy.hpp
@@ -11,6 +12,7 @@ set(sniffcraft_PUBLIC_HDR
 
 set(sniffcraft_SRC
     src/Compression.cpp
+    src/FileUtilities.cpp
     src/Logger.cpp
     src/MinecraftProxy.cpp
     src/server.cpp

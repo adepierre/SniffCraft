@@ -15,6 +15,7 @@
 #include <deque>
 #include <chrono>
 #include <set>
+#include <ctime>
 
 struct LogItem
 {
@@ -44,8 +45,12 @@ private:
     std::condition_variable log_condition;
     std::deque<LogItem> logging_queue;
 
+    std::string logfile_path;
     std::ofstream log_file;
     bool is_running;
+
+    std::time_t last_time_checked_log_file;
+    std::time_t last_time_log_file_modified;
 
     std::map<std::pair<ProtocolCraft::ConnectionState, Origin>, std::set<int> > ignored_packets;
     std::map<std::pair<ProtocolCraft::ConnectionState, Origin>, std::set<int> > detailed_packets;
