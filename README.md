@@ -10,6 +10,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Supported minecraft versions: 1.12.2, 1.13, 1.13.1, 1.13.2, 1.14, 1.14.1, 1.14.2, 1.14.3, 1.14.4, 1.15, 1.15.1, 1.15.2, 1.16, 1.16.1
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
+- Configuration (which packet to log/ignore) can be changed without restarting
 
 Here is an example of a captured session:
 ```javascript

@@ -121,6 +121,7 @@ void Logger::LoadConfig(const std::string& path)
     }
 
     last_time_log_file_modified = modification_time;
+    std::cout << "Loading updated conf file" << std::endl;
 
     std::stringstream ss;
     std::ifstream file;
@@ -193,12 +194,13 @@ void Logger::LoadConfig(const std::string& path)
 
 void Logger::LoadPacketsFromJson(const picojson::value& value, const ProtocolCraft::ConnectionState connection_state)
 {
+    ignored_packets[{connection_state, Origin::Client}] = std::set<int>();
+    ignored_packets[{connection_state, Origin::Server}] = std::set<int>();
+    detailed_packets[{connection_state, Origin::Client}] = std::set<int>();
+    detailed_packets[{connection_state, Origin::Server}] = std::set<int>();
+
     if (value.is<picojson::null>())
     {
-        ignored_packets[{connection_state, Origin::Client}] = std::set<int>();
-        ignored_packets[{connection_state, Origin::Server}] = std::set<int>();
-        detailed_packets[{connection_state, Origin::Client}] = std::set<int>();
-        detailed_packets[{connection_state, Origin::Server}] = std::set<int>();
         return;
     }
 
