@@ -1,6 +1,6 @@
 #Download botcraft library
 
-file(GLOB RESULT ${CMAKE_SOURCE_DIR}/3rdparty/botcraft)
+file(GLOB RESULT ${CMAKE_SOURCE_DIR}/3rdparty/botcraft/protocolCraft)
 list(LENGTH RESULT RES_LEN)
 if(RES_LEN EQUAL 0)
     message(STATUS "Botcraft not found, cloning it...")
