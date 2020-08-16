@@ -271,6 +271,11 @@ void MinecraftProxy::ParsePacket(const Origin from, std::vector<unsigned char>::
                 "PARSING EXCEPTION: " << ex.what() << " || " << msg->GetName() << std::endl;
         }
     }
+    else
+    {
+        std::cout << ((from == Origin::Server) ? "Server --> Client: " : "Client --> Server: ") <<
+            "NULL MESSAGE WITH ID: " << minecraftID << std::endl;
+    }
 
     logger.Log(msg, connection_state, from);
 }

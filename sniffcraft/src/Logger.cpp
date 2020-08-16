@@ -4,6 +4,7 @@
 #include <iomanip>
 
 #include <protocolCraft/MessageFactory.hpp>
+#include <protocolCraft/Handler.hpp>
 #include <sniffcraft/FileUtilities.hpp>
 
 Logger::Logger(const std::string &conf_path)
@@ -87,7 +88,7 @@ void Logger::LogConsume()
                 {
                     std::cout << output_str << std::endl;
                 }
-                return;
+                continue;
             }
 
             const std::set<int>& ignored_set = ignored_packets[{item.connection_state, item.origin}];

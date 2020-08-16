@@ -21,8 +21,8 @@ find_package(Threads)
 
 # Version selection stuffs
 set(GAME_VERSION "1.12.2" CACHE STRING "Each version of the game uses a specific protocol. Make sure this matches the version of your server.")
-set(GameVersionValues "1.12.2;1.13;1.13.1;1.13.2;1.14;1.14.1;1.14.2;1.14.3;1.14.4;1.15;1.15.1;1.15.2;1.16;1.16.1;Other")
-set(ProtocolVersionValues "340;393;401;404;477;480;485;490;498;573;575;578;735;736;-1")
+set(GameVersionValues "1.12.2;1.13;1.13.1;1.13.2;1.14;1.14.1;1.14.2;1.14.3;1.14.4;1.15;1.15.1;1.15.2;1.16;1.16.1;1.16.2;Other")
+set(ProtocolVersionValues "340;393;401;404;477;480;485;490;498;573;575;578;735;736;751;-1")
 set_property(CACHE GAME_VERSION PROPERTY STRINGS ${GameVersionValues})
 
 if(GAME_VERSION STREQUAL "Other")

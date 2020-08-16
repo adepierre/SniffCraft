@@ -1,7 +1,6 @@
 #pragma once
 
 #include "enums.hpp"
-#include "Handler.hpp"
 
 #include <protocolCraft/enums.hpp>
 #include <protocolCraft/Message.hpp>

@@ -5,9 +5,10 @@
 #include <vector>
 #include <mutex>
 
+#include <protocolCraft/Handler.hpp>
+
 #include "sniffcraft/enums.hpp"
 #include "sniffcraft/Logger.hpp"
-#include "sniffcraft/Handler.hpp"
 
 #define MAX_LENGTH 1024
 
