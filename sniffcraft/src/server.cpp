@@ -5,8 +5,8 @@
 #include <iostream>
 #include <utility>
 
-Server::Server(asio::io_context& io_context, const short client_port,
-    const std::string& server_address, const short server_port, const std::string &logconf_path_) : 
+Server::Server(asio::io_context& io_context, const unsigned short client_port,
+    const std::string& server_address, const unsigned short server_port, const std::string &logconf_path_) : 
     io_context_(io_context),
     acceptor_(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), client_port)),
     server_address_(server_address),

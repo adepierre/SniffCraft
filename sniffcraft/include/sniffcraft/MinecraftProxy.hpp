@@ -16,7 +16,7 @@ class MinecraftProxy : public ProtocolCraft::Handler
 {
 public:
     MinecraftProxy(asio::io_context& io_context, const std::string &logconf_path);
-    void Start(const std::string& server_address, const short server_port);
+    void Start(const std::string& server_address, const unsigned short server_port);
     void Close();
     asio::ip::tcp::socket& ClientSocket();
     asio::ip::tcp::socket& ServerSocket();
@@ -38,6 +38,7 @@ private:
     virtual void Handle(ProtocolCraft::Handshake& msg) override;
     virtual void Handle(ProtocolCraft::LoginSuccess& msg) override;
     virtual void Handle(ProtocolCraft::SetCompression& msg) override;
+    virtual void Handle(ProtocolCraft::EncryptionRequest& msg) override;
 
 private:
     asio::ip::tcp::socket client_socket_;

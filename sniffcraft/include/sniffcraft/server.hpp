@@ -7,8 +7,8 @@ class MinecraftProxy;
 class Server
 {
 public:
-    Server(asio::io_context& io_context, const short client_port,
-        const std::string& server_address, const short server_port,
+    Server(asio::io_context& io_context, const unsigned short client_port,
+        const std::string& server_address, const unsigned short server_port,
         const std::string& logconf_path_);
 
 private:
@@ -20,7 +20,7 @@ private:
     asio::ip::tcp::acceptor acceptor_;
 
     std::string server_address_;
-    short server_port_;
+    unsigned short server_port_;
 
     std::string logconf_path;
 };

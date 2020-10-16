@@ -30,7 +30,7 @@ asio::ip::tcp::socket& MinecraftProxy::ServerSocket()
     return server_socket_;
 }
 
-void MinecraftProxy::Start(const std::string& server_address, const short server_port)
+void MinecraftProxy::Start(const std::string& server_address, const unsigned short server_port)
 {
     std::cout << "Starting new proxy to " << server_address << ":" << server_port << std::endl;
 
@@ -298,4 +298,10 @@ void MinecraftProxy::Handle(ProtocolCraft::LoginSuccess& msg)
 void MinecraftProxy::Handle(ProtocolCraft::SetCompression& msg)
 {
     compression_threshold = msg.GetThreshold();
+}
+
+void MinecraftProxy::Handle(ProtocolCraft::EncryptionRequest& msg)
+{
+    std::cerr << "WARNING, trying to connect to a server with encryption enabled\n"<<
+        "Sniffcraft does NOT support encryption at the moment" << std::endl;
 }
