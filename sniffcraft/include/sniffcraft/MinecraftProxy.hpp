@@ -33,6 +33,8 @@ private:
     void ExtractPacketFromIncomingData(const Origin from, const size_t& bytes_transferred);
     void ParsePacket(const Origin from, std::vector<unsigned char>::const_iterator& read_iter, size_t& max_length);
 
+    const std::vector<unsigned char> PacketToBytes(const ProtocolCraft::Message& msg);
+
 private:
     virtual void Handle(ProtocolCraft::Message& msg) override;
     virtual void Handle(ProtocolCraft::Handshake& msg) override;
@@ -41,6 +43,8 @@ private:
     virtual void Handle(ProtocolCraft::EncryptionRequest& msg) override;
 
 private:
+    asio::io_context& io_context_;
+
     asio::ip::tcp::socket client_socket_;
     std::array<unsigned char, MAX_LENGTH> input_client_buffer_;
     asio::ip::tcp::socket server_socket_;
@@ -60,8 +64,13 @@ private:
 
     ProtocolCraft::ConnectionState connection_state;
 
+    std::vector<unsigned char> client_replacement_data;
+    std::vector<unsigned char> server_replacement_data;
+
     int compression_threshold;
 
     Logger logger;
+    std::string server_ip_;
+    unsigned short server_port_;
 };
 

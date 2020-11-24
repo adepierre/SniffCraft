@@ -43,7 +43,7 @@ Here is an example of a captured session:
 
 ### /!\ Encryption is not supported /!\
 
-As both the client and the server must share the same public key when authenticating to Mojang's session server, we can't use an intermediate decrypt/encrypt layer. I'd like to support encryption too, but I'm affraid that's simply not possible (feel free to open an issue if you have any suggestion on this matter). Use SniffCraft only with server with online-mode=false.
+As both the client and the server must share the same public key when authenticating to Mojang's session server, we can't use an intermediate decrypt/encrypt layer. I'd like to support encryption too, but I'm affraid that's simply not possible without a modification in the client, but in this case, SniffCraft is useless as you could modify it directly to log the packets. Feel free to open an issue if you have any suggestion on this matter. Use SniffCraft only with server with online-mode=false.
 
 ## Dependencies
 
@@ -56,13 +56,13 @@ You don't have to install any dependency to build SniffCraft, everything that is
 
 ## Building and launch
 
-To build for game version 1.16.3:
+To build for latest game version:
 ```
 git clone https://github.com/adepierre/SniffCraft.git
 cd sniffcraft
 mkdir build
 cd build
-cmake -DGAME_VERSION=1.16.3 ..
+cmake -DGAME_VERSION=latest ..
 make all
 ```
 
@@ -71,12 +71,12 @@ If you are on Windows, you can replace the last four steps by launching cmake GU
 Once built, you can start SniffCraft with the following command line:
 
 ```
-sniffcraft listening_port server_ip server_port logconf_filepath
+sniffcraft listening_port server_address logconf_filepath
 ```
 
 logconf_filepath is an optional json file, and can be used to filter out the packets. Examples can be found in the [conf](conf/) directory. With the default configuration, only the names of the packets are logged. When a packet is added to an ignored list, it won't appear in the logs, when it's in a detail list, its full content will be logged. Packets can be added either by id or by name (as registered in protocolCraft), but as id can vary from one version to another, using names is safer.
 
-server_ip and server_port should match the address of the server you want to connect to. You can then connect your official minecraft client to SniffCraft as if it were a regular server. If you are running SniffCraft on the same computer as your client, something as 127.0.0.1:listening_port should work.
+server_address should match the address of the server you want to connect to, with the same format as in a regular minecraft client. Custom URL with DNS SRV records are supported (like MyServer.Example.net for example). You can then connect your official minecraft client to SniffCraft as if it were a regular server. If you are running SniffCraft on the same computer as your client, something as 127.0.0.1:listening_port should work.
 
 ## License
 

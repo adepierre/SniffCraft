@@ -7,6 +7,11 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/Logger.hpp
     include/sniffcraft/MinecraftProxy.hpp
     include/sniffcraft/server.hpp
+    
+    include/sniffcraft/DNS/DNSMessage.hpp
+    include/sniffcraft/DNS/DNSQuestion.hpp
+    include/sniffcraft/DNS/DNSResourceRecord.hpp
+    include/sniffcraft/DNS/DNSSrvData.hpp
 )
 
 set(sniffcraft_SRC
