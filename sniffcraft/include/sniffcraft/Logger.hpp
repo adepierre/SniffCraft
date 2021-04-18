@@ -15,6 +15,7 @@
 #include <chrono>
 #include <set>
 #include <ctime>
+#include <condition_variable>
 
 struct LogItem
 {
