@@ -328,32 +328,32 @@ void MinecraftProxy::Handle(ProtocolCraft::Message& msg)
 
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::Handshake& msg)
+void MinecraftProxy::Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg)
 {
-    connection_state = (ProtocolCraft::ConnectionState)msg.GetNextState();
+    connection_state = (ProtocolCraft::ConnectionState)msg.GetIntention();
 
-    ProtocolCraft::Handshake replacement_handshake;
-    replacement_handshake.SetNextState(msg.GetNextState());
-    replacement_handshake.SetProtocolVersion(msg.GetProtocolVersion());
-    replacement_handshake.SetServerAddress(server_ip_);
-    replacement_handshake.SetServerPort(server_port_);
+    ProtocolCraft::ServerboundClientIntentionPacket replacement_intention_packet;
+    replacement_intention_packet.SetIntention(msg.GetIntention());
+    replacement_intention_packet.SetProtocolVersion(msg.GetProtocolVersion());
+    replacement_intention_packet.SetHostName(server_ip_);
+    replacement_intention_packet.SetPort(server_port_);
 
-    const std::vector<unsigned char> replacement_bytes = PacketToBytes(replacement_handshake);
+    const std::vector<unsigned char> replacement_bytes = PacketToBytes(replacement_intention_packet);
     client_replacement_data.insert(client_replacement_data.end(), replacement_bytes.begin(), replacement_bytes.end());
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::LoginSuccess& msg)
+void MinecraftProxy::Handle(ProtocolCraft::ClientboundGameProfilePacket& msg)
 {
     connection_state = ProtocolCraft::ConnectionState::Play;
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::SetCompression& msg)
+void MinecraftProxy::Handle(ProtocolCraft::ClientboundLoginCompressionPacket& msg)
 {
-    compression_threshold = msg.GetThreshold();
+    compression_threshold = msg.GetCompressionThreshold();
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::EncryptionRequest& msg)
+void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 {
     std::cerr << "WARNING, trying to connect to a server with encryption enabled\n"<<
-        "Sniffcraft does NOT support encryption at the moment" << std::endl;
+        "Sniffcraft does NOT support encryption (yet?)" << std::endl;
 }

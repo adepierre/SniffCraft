@@ -37,10 +37,10 @@ private:
 
 private:
     virtual void Handle(ProtocolCraft::Message& msg) override;
-    virtual void Handle(ProtocolCraft::Handshake& msg) override;
-    virtual void Handle(ProtocolCraft::LoginSuccess& msg) override;
-    virtual void Handle(ProtocolCraft::SetCompression& msg) override;
-    virtual void Handle(ProtocolCraft::EncryptionRequest& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundGameProfilePacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundLoginCompressionPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundHelloPacket& msg) override;
 
 private:
     asio::io_context& io_context_;

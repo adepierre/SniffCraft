@@ -7,7 +7,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features and limitations
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.16.5
+- Supported minecraft versions: all official releases from 1.12.2 to 1.17
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 - Configuration (which packet to log/ignore) can be changed without restarting
@@ -15,29 +15,28 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 Here is an example of a captured session:
 ```javascript
-[0:0:6:6817] [S --> C] Time Update
-[0:0:6:6868] [S --> C] Destroy Entities
-[0:0:7:7149] [C --> S] Player Block Placement
-[0:0:7:7150] [C --> S] Animation (serverbound)
-[0:0:7:7169] [S --> C] Set Slot
+[0:1:98:98514] [S --> C] Level Event
+[0:1:100:100160] [S --> C] Level Event
+[0:1:100:100160] [S --> C] Level Event
+[0:1:111:111457] [C --> S] Container Click
 {
-  "slot": 30,
-  "slot_data": {
-    "block_id": 54,
-    "item_count": 1,
-    "item_damage": 0
+  "button_num": 0,
+  "carried_item": {
+    "present": false
   },
-  "window_id": 1
+  "changed_slots": {
+    "46": {
+      "item_count": 1,
+      "item_id": 37,
+      "present": true
+    }
+  },
+  "click_type": 0,
+  "container_id": 6,
+  "slot_num": 46
 }
-[0:0:7:7169] [S --> C] Block change
-{
-  "block_id": 980,
-  "location": {
-    "x": -160,
-    "y": 67,
-    "z": 206
-  }
-}
+
+[0:2:122:122761] [S --> C] Player Info
 ```
 
 

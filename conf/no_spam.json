@@ -44,25 +44,37 @@
     },
     "Play": {
         "ignored_clientbound" : [
-            "Entity Relative Move",
-            "Entity Look And Relative Move",
-            "Player Position And Look (clientbound)",
-            "Entity Head Look",
-            "Chunk Data",
-            "Unload Chunk",
-            "Entity Metadata",
-            "Entity Properties",
-            "Spawn Mob",
-            "Entity Velocity",
-            "Entity Teleport",
-            "Entity Equipment",
-            "Spawn Object"
-            
+            "Move Entity Pos",
+            "Move Entity PosRot",
+            "Move Entity Rot",
+            "Entity Event",
+            "Player Position",
+            "Rotate Head",
+            "Level Chunk",
+            "Section Blocks Update",
+            "Light Update",
+            "Forget Level Chunk",
+            "Set Entity Data",
+            "Update Attributes",
+            "Add Entity",
+            "Set Entity Motion",
+            "Teleport Entity",
+            "Set Equipment",
+            "Add Mob",
+            "Remove Entity",
+            "Block Update",
+            "Animate",
+            "Keep Alive",
+            "Set Time",
+            "Block Event",
+            "Sound"
         ],
         "ignored_serverbound" : [
-            "Player Look",
-            "Player Position And Look (serverbound)",
-            "Player Position"
+            "Move Player Pos",
+            "Move Player PosRot",
+            "Move Player Rot",
+            "Move Player Status Only",
+            "Keep Alive"
         ],
         "detailed_clientbound": [
             
