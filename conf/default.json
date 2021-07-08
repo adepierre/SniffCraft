@@ -1,5 +1,6 @@
 {
     "LogToConsole": false,
+    "LogToReplay": false,
     "Handshaking": {
         "ignored_clientbound" : [
         

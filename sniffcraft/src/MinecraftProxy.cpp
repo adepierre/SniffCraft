@@ -37,6 +37,8 @@ void MinecraftProxy::Start(const std::string& server_address, const unsigned sho
     server_ip_ = server_address;
     server_port_ = server_port;
 
+    logger.SetServerName(server_ip_ + ":" + std::to_string(server_port_));
+
     // Try to connect to remote server
     asio::ip::tcp::resolver resolver(io_context_);
     asio::ip::tcp::resolver::query query(server_ip_, std::to_string(server_port_));

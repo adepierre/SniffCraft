@@ -78,10 +78,12 @@
             "Keep Alive"
         ],
         "detailed_clientbound": [
-            
+            "Container Set Content",
+            "Container Set Slot"
         ],
         "detailed_serverbound": [
-            
+            "Container Click",
+            "Container Close"
         ]
     }
 }

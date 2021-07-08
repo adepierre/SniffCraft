@@ -9,8 +9,8 @@
 
 Logger::Logger(const std::string &conf_path)
 {
-    logfile_path = conf_path;
-    LoadConfig(logfile_path);
+    logconf_path = conf_path;
+    LoadConfig(logconf_path, false);
 
     is_running = true;
     log_thread = std::thread(&Logger::LogConsume, this);
@@ -28,6 +28,12 @@ Logger::~Logger()
 
     log_file.close();
 
+    if (log_to_replay)
+    {
+        replay_file.close();
+        SaveReplayMetadataFile();
+    }
+
     if (log_thread.joinable())
     {
         log_thread.join();
@@ -37,20 +43,32 @@ Logger::~Logger()
 void Logger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Origin origin)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
-    if (!log_file.is_open())
+    if (!log_file.is_open() || (log_to_replay && !replay_file.is_open()))
     {
         start_time = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
 
         std::stringstream ss;
-        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d-%H-%M-%S")
-            << "_log.txt";
+        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d-%H-%M-%S");
+        session_prefix = ss.str();
 
-        log_file = std::ofstream(ss.str(), std::ios::out);
+        if (!log_file.is_open())
+        {
+            log_file = std::ofstream(session_prefix + "_log.txt", std::ios::out);
+        }
+        if (log_to_replay && !replay_file.is_open())
+        {
+            replay_file = std::ofstream(session_prefix + "_replay.tmcpr", std::ios::out | std::ios::binary);
+        }
     }
 
-    logging_queue.push_back({ msg, std::chrono::system_clock::now(), connection_state, origin });
+    logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin });
     log_condition.notify_all();
+}
+
+void Logger::SetServerName(const std::string& server_name_)
+{
+    server_name = server_name_;
 }
 
 void Logger::LogConsume()
@@ -67,19 +85,44 @@ void Logger::LogConsume()
             {
                 std::lock_guard<std::mutex> log_guard(log_mutex);
                 item = logging_queue.front();
-                logging_queue.pop_front();
+                logging_queue.pop();
             }
 
-            auto milisec = std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count();
-            auto sec = std::chrono::duration_cast<std::chrono::seconds>(item.date - start_time).count();
-            auto min = std::chrono::duration_cast<std::chrono::minutes>(item.date - start_time).count();
             auto hours = std::chrono::duration_cast<std::chrono::hours>(item.date - start_time).count();
+            auto min = std::chrono::duration_cast<std::chrono::minutes>(item.date - start_time).count();
+            auto sec = std::chrono::duration_cast<std::chrono::seconds>(item.date - start_time).count();
+            auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count();
+            auto total_millisec = millisec;
+            millisec -= sec * 1000;
+            sec -= min * 60;
+            min -= hours * 60;
+
+            if (log_to_replay && item.origin == Origin::Server
+                && (item.connection_state == ProtocolCraft::ConnectionState::Play ||
+                    (item.connection_state == ProtocolCraft::ConnectionState::Login && item.msg->GetId() == 0x02)))
+            {
+                std::vector<unsigned char> packet;
+                // Write ID + Packet data
+                item.msg->Write(packet);
+
+                // Get total size
+                std::vector<unsigned char> packet_size;
+                ProtocolCraft::WriteData<int>(packet.size(), packet_size);
+
+                // Get timestamp in ms
+                std::vector<unsigned char> timestamp;
+                ProtocolCraft::WriteData<int>(total_millisec, timestamp);
+
+                replay_file.write((char*)timestamp.data(), timestamp.size());
+                replay_file.write((char*)packet_size.data(), packet_size.size());
+                replay_file.write((char*)packet.data(), packet.size());
+            }
 
             std::stringstream output;
 
             if (item.msg == nullptr)
             {
-                output << "[" << hours << ":" << min << ":" << sec << ":" << milisec << "] "
+                output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
                     << (item.origin == Origin::Server ? "[S --> C] " : "[C --> S] ");
                 output << "UNKNOWN OR WRONGLY PARSED MESSAGE";
                 const std::string output_str = output.str();
@@ -101,7 +144,7 @@ void Logger::LogConsume()
             const std::set<int>& detailed_set = detailed_packets[{item.connection_state, item.origin}];
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
 
-            output << "[" << hours << ":" << min << ":" << sec << ":" << milisec << "] "
+            output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
                 << (item.origin == Origin::Server ? "[S --> C] " : "[C --> S] ");
             output << item.msg->GetName();
             if (is_detailed)
@@ -121,13 +164,13 @@ void Logger::LogConsume()
             if (now - last_time_checked_log_file > 5)
             {
                 last_time_checked_log_file = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-                LoadConfig(logfile_path);
+                LoadConfig(logconf_path, true);
             }
         }
     }
 }
 
-void Logger::LoadConfig(const std::string& path)
+void Logger::LoadConfig(const std::string& path, const bool refresh)
 {
     std::time_t modification_time = GetModifiedTimestamp(path);
     if (modification_time == -1 ||
@@ -202,6 +245,15 @@ void Logger::LoadConfig(const std::string& path)
     else
     {
         log_to_console = log_to_console_value->second.get<bool>();
+    }
+
+    if (!refresh)
+    {
+        auto log_to_replay_file = obj.find("LogToReplay");
+        if (log_to_console_value != obj.end())
+        {
+            log_to_replay = log_to_replay_file->second.get<bool>();
+        }
     }
 
     for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
@@ -335,4 +387,18 @@ void Logger::LoadPacketsFromJson(const picojson::value& value, const ProtocolCra
             }
         }
     }
+}
+
+void Logger::SaveReplayMetadataFile() const
+{
+    std::ofstream metadata(session_prefix + "_metaData.json", std::ios::out);
+
+    metadata << "{\"singleplayer\":false," 
+             << "\"serverName\"" << server_name << ","
+             << "\"duration\":" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count() << ","
+             << "\"fileFormat\":\"MCPR\"," 
+             << "\"fileFormatVersion\":14," 
+             << "\"protocol\":" << PROTOCOL_VERSION << ","
+             << "\"generator\":\"SniffCraft\"}";
+    metadata.close();
 }
