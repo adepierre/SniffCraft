@@ -9,6 +9,7 @@
 
 #include "sniffcraft/enums.hpp"
 #include "sniffcraft/Logger.hpp"
+#include "sniffcraft/ReplayModLogger.hpp"
 
 #define MAX_LENGTH 1024
 
@@ -70,6 +71,7 @@ private:
     int compression_threshold;
 
     Logger logger;
+    ReplayModLogger replay_logger;
     std::string server_ip_;
     unsigned short server_port_;
 };

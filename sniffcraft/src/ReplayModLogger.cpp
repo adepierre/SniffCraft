@@ -1,0 +1,183 @@
+#include "sniffcraft/ReplayModLogger.hpp"
+
+#include <sstream>
+#include <iomanip>
+
+#include <protocolCraft/MessageFactory.hpp>
+#include <protocolCraft/Handler.hpp>
+#include <sniffcraft/FileUtilities.hpp>
+
+ReplayModLogger::ReplayModLogger(const std::string &conf_path)
+{
+    TryStart(conf_path);
+}
+
+ReplayModLogger::~ReplayModLogger()
+{
+    if (is_running)
+    {
+        is_running = false;
+        log_condition.notify_all();
+
+        while (!logging_queue.empty())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
+        replay_file.close();
+        SaveReplayMetadataFile();
+
+        if (log_thread.joinable())
+        {
+            log_thread.join();
+        }
+    }
+}
+
+void ReplayModLogger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Origin origin)
+{
+    if (!is_running)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> log_guard(log_mutex);
+    if (!replay_file.is_open())
+    {
+        start_time = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
+
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d-%H-%M-%S");
+        session_prefix = ss.str();
+        replay_file = std::ofstream(session_prefix + "_recording.tmcpr", std::ios::out | std::ios::binary);
+    }
+
+    logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin });
+    log_condition.notify_all();
+}
+
+void ReplayModLogger::SetServerName(const std::string& server_name_)
+{
+    server_name = server_name_;
+}
+
+void ReplayModLogger::LogConsume()
+{
+    while (is_running)
+    {
+        {
+            std::unique_lock<std::mutex> lock(log_mutex);
+            log_condition.wait(lock);
+        }
+        while (!logging_queue.empty())
+        {
+            LogItem item;
+            {
+                std::lock_guard<std::mutex> log_guard(log_mutex);
+                item = logging_queue.front();
+                logging_queue.pop();
+            }
+
+            auto hours = std::chrono::duration_cast<std::chrono::hours>(item.date - start_time).count();
+            auto min = std::chrono::duration_cast<std::chrono::minutes>(item.date - start_time).count();
+            auto sec = std::chrono::duration_cast<std::chrono::seconds>(item.date - start_time).count();
+            auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count();
+            auto total_millisec = millisec;
+            millisec -= sec * 1000;
+            sec -= min * 60;
+            min -= hours * 60;
+
+            if (item.origin == Origin::Server
+                && (item.connection_state == ProtocolCraft::ConnectionState::Play ||
+                    (item.connection_state == ProtocolCraft::ConnectionState::Login && item.msg->GetId() == 0x02)))
+            {
+                std::vector<unsigned char> packet;
+                // Write ID + Packet data
+                item.msg->Write(packet);
+
+                // Get total size
+                std::vector<unsigned char> packet_size;
+                ProtocolCraft::WriteData<int>(packet.size(), packet_size);
+
+                // Get timestamp in ms
+                std::vector<unsigned char> timestamp;
+                ProtocolCraft::WriteData<int>(total_millisec, timestamp);
+
+                replay_file.write((char*)timestamp.data(), timestamp.size());
+                replay_file.write((char*)packet_size.data(), packet_size.size());
+                replay_file.write((char*)packet.data(), packet.size());
+            }
+        }
+    }
+}
+
+void ReplayModLogger::TryStart(const std::string& conf_path)
+{
+    std::stringstream ss;
+    std::ifstream file;
+
+    bool error = conf_path == "";
+    picojson::value json;
+
+    if (!error)
+    {
+        file.open(conf_path);
+        if (!file.is_open())
+        {
+            std::cerr << "Error trying to open conf file: " << conf_path << "." << std::endl;
+            error = true;
+        }
+        if (!error)
+        {
+            ss << file.rdbuf();
+            file.close();
+
+            ss >> json;
+            std::string err = picojson::get_last_error();
+
+            if (!err.empty())
+            {
+                std::cerr << "Error parsing conf file at " << conf_path << ".\n";
+                std::cerr << err << "\n" << std::endl;
+                error = true;
+            }
+            if (!error)
+            {
+                if (!json.is<picojson::object>())
+                {
+                    std::cerr << "Error parsing conf file at " << conf_path << "." << std::endl;
+                    error = true;
+                }
+            }
+        }
+    }
+
+    //Create default conf
+    if (error)
+    {
+        return;
+    }
+
+    const picojson::value::object& obj = json.get<picojson::object>();
+    auto log_to_replay_file = obj.find("LogToReplay");
+    if (log_to_replay_file != obj.end() && log_to_replay_file->second.get<bool>())
+    {
+        is_running = true;
+        log_thread = std::thread(&ReplayModLogger::LogConsume, this);
+    }
+}
+
+void ReplayModLogger::SaveReplayMetadataFile() const
+{
+    std::ofstream metadata(session_prefix + "_metaData.json", std::ios::out);
+
+    metadata << "{\"singleplayer\":false," 
+             << "\"serverName\":\"" << server_name << "\","
+             << "\"duration\":" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count() << ","
+             << "\"fileFormat\":\"MCPR\"," 
+             << "\"fileFormatVersion\":14," 
+             << "\"protocol\":" << PROTOCOL_VERSION << ","
+             << "\"generator\":\"SniffCraft\"}";
+    metadata.close();
+}

@@ -5,7 +5,9 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/enums.hpp
     include/sniffcraft/FileUtilities.hpp
     include/sniffcraft/Logger.hpp
+    include/sniffcraft/LogItem.hpp
     include/sniffcraft/MinecraftProxy.hpp
+    include/sniffcraft/ReplayModLogger.hpp
     include/sniffcraft/server.hpp
     
     include/sniffcraft/DNS/DNSMessage.hpp
@@ -19,6 +21,7 @@ set(sniffcraft_SRC
     src/FileUtilities.cpp
     src/Logger.cpp
     src/MinecraftProxy.cpp
+    src/ReplayModLogger.cpp
     src/server.cpp
     src/main.cpp
 )

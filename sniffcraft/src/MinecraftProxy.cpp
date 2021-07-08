@@ -12,7 +12,8 @@ MinecraftProxy::MinecraftProxy(asio::io_context& io_context, const std::string& 
     io_context_(io_context),
     client_socket_(io_context),
     server_socket_(io_context),
-    logger(logconf_path)
+    logger(logconf_path),
+    replay_logger(logconf_path)
 {
     connection_state = ProtocolCraft::ConnectionState::Handshake;
     client_closed = false;
@@ -37,7 +38,7 @@ void MinecraftProxy::Start(const std::string& server_address, const unsigned sho
     server_ip_ = server_address;
     server_port_ = server_port;
 
-    logger.SetServerName(server_ip_ + ":" + std::to_string(server_port_));
+    replay_logger.SetServerName(server_ip_ + ":" + std::to_string(server_port_));
 
     // Try to connect to remote server
     asio::ip::tcp::resolver resolver(io_context_);
@@ -296,6 +297,7 @@ void MinecraftProxy::ParsePacket(const Origin from, std::vector<unsigned char>::
     }
 
     logger.Log(msg, connection_state, from);
+    replay_logger.Log(msg, connection_state, from);
 }
 
 const std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCraft::Message& msg)

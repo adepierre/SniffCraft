@@ -12,6 +12,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Compression is supported
 - Configuration (which packet to log/ignore) can be changed without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
+- Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
 
 Here is an example of a captured session:
 ```javascript
@@ -53,9 +54,9 @@ You don't have to install any dependency to build SniffCraft, everything that is
 - [zlib](https://github.com/madler/zlib)
 - [botcraft](https://github.com/adepierre/botcraft) (actually, I'm only using protocolCraft lib, but as I haven't separated it from my Botcraft repo, everything is downloaded)
 
-## Building and launch
+## Build and launch
 
-To build for latest game version:
+To build for the latest game version:
 ```
 git clone https://github.com/adepierre/SniffCraft.git
 cd sniffcraft
@@ -76,6 +77,12 @@ sniffcraft listening_port server_address logconf_filepath
 logconf_filepath is an optional json file, and can be used to filter out the packets. Examples can be found in the [conf](conf/) directory. With the default configuration, only the names of the packets are logged. When a packet is added to an ignored list, it won't appear in the logs, when it's in a detail list, its full content will be logged. Packets can be added either by id or by name (as registered in protocolCraft), but as id can vary from one version to another, using names is safer.
 
 server_address should match the address of the server you want to connect to, with the same format as in a regular minecraft client. Custom URL with DNS SRV records are supported (like MyServer.Example.net for example). You can then connect your official minecraft client to SniffCraft as if it were a regular server. If you are running SniffCraft on the same computer as your client, something as 127.0.0.1:listening_port should work.
+
+## Replay Mod
+
+If ``LogToReplay`` is set to true in the configuration file when the session is started, the session will also be logged in a format compatible with [replay mod](https://github.com/ReplayMod/ReplayMod). When the capture stops, you'll get two files: ``XXXX_recording.tmcpr`` and ``XXXX_metaData.json``. You'll need to rename them to ``recording.tmcpr`` and metaData.json`` before zipping them together in a ``.mcpr`` file. This file can then be opened by the replay mod viewer inside minecraft.
+
+Please note that, the current player will **not** appear on this capture, as the replay mod artifically adds some packets to display it.
 
 ## License
 
