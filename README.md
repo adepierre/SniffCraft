@@ -80,7 +80,7 @@ server_address should match the address of the server you want to connect to, wi
 
 ## Replay Mod
 
-If ``LogToReplay`` is set to true in the configuration file when the session is started, the session will also be logged in a format compatible with [replay mod](https://github.com/ReplayMod/ReplayMod). When the capture stops, you'll get two files: ``XXXX_recording.tmcpr`` and ``XXXX_metaData.json``. You'll need to rename them to ``recording.tmcpr`` and metaData.json`` before zipping them together in a ``.mcpr`` file. This file can then be opened by the replay mod viewer inside minecraft.
+If ``LogToReplay`` is set to true in the configuration file when the session starts, all packets will also be logged in a format compatible with [replay mod](https://github.com/ReplayMod/ReplayMod). When the capture stops, you'll get two files: ``XXXX_recording.tmcpr`` and ``XXXX_metaData.json``. You'll need to rename them to ``recording.tmcpr`` and ``metaData.json`` before zipping them together in a ``.mcpr`` file. This file can then be opened by the replay mod viewer inside minecraft.
 
 Please note that, the current player will **not** appear on this capture, as the replay mod artifically adds some packets to display it.
 
