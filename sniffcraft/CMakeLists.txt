@@ -14,6 +14,10 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/DNS/DNSQuestion.hpp
     include/sniffcraft/DNS/DNSResourceRecord.hpp
     include/sniffcraft/DNS/DNSSrvData.hpp
+    
+    include/sniffcraft/Zip/CRC32.hpp
+    include/sniffcraft/Zip/DosTime.hpp
+    include/sniffcraft/Zip/ZeptoZip.hpp
 )
 
 set(sniffcraft_SRC
@@ -24,6 +28,8 @@ set(sniffcraft_SRC
     src/ReplayModLogger.cpp
     src/server.cpp
     src/main.cpp
+    
+    src/Zip/ZeptoZip.cpp
 )
 
 # To have a nice files structure in Visual Studio

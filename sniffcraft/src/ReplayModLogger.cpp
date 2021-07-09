@@ -1,4 +1,5 @@
 #include "sniffcraft/ReplayModLogger.hpp"
+#include "sniffcraft/Zip/ZeptoZip.hpp"
 
 #include <sstream>
 #include <iomanip>
@@ -24,13 +25,14 @@ ReplayModLogger::~ReplayModLogger()
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
 
-        replay_file.close();
-        SaveReplayMetadataFile();
-
         if (log_thread.joinable())
         {
             log_thread.join();
         }
+        replay_file.close();
+
+        SaveReplayMetadataFile();
+        WrapMCPRFile();
     }
 }
 
@@ -171,13 +173,23 @@ void ReplayModLogger::TryStart(const std::string& conf_path)
 void ReplayModLogger::SaveReplayMetadataFile() const
 {
     std::ofstream metadata(session_prefix + "_metaData.json", std::ios::out);
+    auto now = std::chrono::system_clock::now();
 
     metadata << "{\"singleplayer\":false," 
              << "\"serverName\":\"" << server_name << "\","
-             << "\"duration\":" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count() << ","
+             << "\"duration\":" << std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() << ","
+             << "\"date\":" << std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() << ","
              << "\"fileFormat\":\"MCPR\"," 
              << "\"fileFormatVersion\":14," 
              << "\"protocol\":" << PROTOCOL_VERSION << ","
              << "\"generator\":\"SniffCraft\"}";
     metadata.close();
+}
+
+void ReplayModLogger::WrapMCPRFile() const
+{
+    ZeptoZip::CreateZipArchive(session_prefix + ".mcpr", { session_prefix + "_metaData.json", session_prefix + "_recording.tmcpr" },
+        { "metaData.json", "recording.tmcpr" }, { true, true });
+    std::remove((session_prefix + "_metaData.json").c_str());
+    std::remove((session_prefix + "_recording.tmcpr").c_str());
 }

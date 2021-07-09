@@ -30,6 +30,7 @@ private:
     void LogConsume();
     void TryStart(const std::string& conf_path);
     void SaveReplayMetadataFile() const;
+    void WrapMCPRFile() const;
 
 private:
     std::chrono::time_point<std::chrono::system_clock> start_time;

@@ -28,6 +28,47 @@ std::vector<unsigned char> Compress(const std::vector<unsigned char> &raw, const
     return std::vector<unsigned char>(compressedData.begin(), compressedData.begin() + compressedSize);
 }
 
+std::vector<unsigned char> CompressRawDeflate(const std::vector<unsigned char>& raw, const int& start, const int& size)
+{
+    z_stream strm;
+    memset(&strm, 0, sizeof(strm));
+
+    strm.next_in = const_cast<unsigned char*>(raw.data() + start);
+    strm.avail_in = size > 0 ? size : raw.size() - start;
+
+    int res = deflateInit2(&strm, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+    if (res != Z_OK)
+    {
+        throw(std::runtime_error("deflateInit failed: " + std::string(strm.msg)));
+    }
+
+    std::vector<unsigned char> compressed_data;
+    std::vector<unsigned char> buffer(64 * 1024);
+
+    int ret;
+    do {
+        strm.next_out = const_cast<unsigned char*>(buffer.data());
+        strm.avail_out = buffer.size();
+
+        ret = deflate(&strm, Z_FINISH);
+
+        if (compressed_data.size() < strm.total_out)
+        {
+            // append the block to the output
+            compressed_data.insert(compressed_data.end(), buffer.begin(), buffer.begin() + strm.total_out - compressed_data.size());
+        }
+    } while (ret == Z_OK);
+
+    deflateEnd(&strm);
+
+    if (ret != Z_STREAM_END)
+    {
+        throw(std::runtime_error("Deflate compression failed: " + std::string(strm.msg)));
+    }
+
+    return compressed_data;
+}
+
 std::vector<unsigned char> Decompress(const std::vector<unsigned char>& compressed, const int& start, const int& size)
 {
     unsigned long size_to_decompress = size > 0 ? size : compressed.size() - start;
@@ -77,3 +118,4 @@ std::vector<unsigned char> Decompress(const std::vector<unsigned char>& compress
         }
     }
 }
+
