@@ -190,7 +190,7 @@ void MinecraftProxy::ExtractPacketFromIncomingData(const Origin from, const size
         // the varint are not in this buffer
         try
         {
-            packet_length = ProtocolCraft::ReadVarInt(read_iter, max_length);
+            packet_length = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(read_iter, max_length);
         }
         catch (const std::exception&)
         {
@@ -254,7 +254,7 @@ void MinecraftProxy::ParsePacket(const Origin from, std::vector<unsigned char>::
 
     if (compression_threshold >= 0)
     {
-        int data_length = ProtocolCraft::ReadVarInt(read_iter, max_length);
+        int data_length = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(read_iter, max_length);
 
         if (data_length != 0)
         {
@@ -264,7 +264,7 @@ void MinecraftProxy::ParsePacket(const Origin from, std::vector<unsigned char>::
         }
     }
 
-    minecraftID = ProtocolCraft::ReadVarInt(read_iter, max_length);
+    minecraftID = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(read_iter, max_length);
 
     std::shared_ptr<ProtocolCraft::Message> msg;
 
@@ -316,13 +316,13 @@ const std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCra
         {
             std::vector<unsigned char> compressed_data = Compress(content);
             content.clear();
-            ProtocolCraft::WriteVarInt(content.size(), content);
+            ProtocolCraft::WriteData<ProtocolCraft::VarInt>(content.size(), content);
             content.insert(content.end(), compressed_data.begin(), compressed_data.end());
         }
     }
 
     std::vector<unsigned char> sized_packet;
-    ProtocolCraft::WriteVarInt(content.size(), sized_packet);
+    ProtocolCraft::WriteData<ProtocolCraft::VarInt>(content.size(), sized_packet);
     sized_packet.insert(sized_packet.end(), content.begin(), content.end());
     return sized_packet;
 }

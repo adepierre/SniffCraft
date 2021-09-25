@@ -1,8 +1,8 @@
 #include "sniffcraft/server.hpp"
 #include "sniffcraft/MinecraftProxy.hpp"
 
-#include "sniffcraft/DNS/DNSMessage.hpp"
-#include "sniffcraft/DNS/DNSSrvData.hpp"
+#include <botcraft/Network/DNS/DNSMessage.hpp>
+#include <botcraft/Network/DNS/DNSSrvData.hpp>
 
 #include <functional>
 #include <iostream>
@@ -83,7 +83,7 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
     asio::ip::udp::socket udp_socket(io_context_);
 
     // Create the query
-    DNSMessage query;
+    Botcraft::DNSMessage query;
     // Random identification
     query.SetIdentification({ 0x42, 0x42 });
     query.SetFlagQR(0);
@@ -98,7 +98,7 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
     query.SetNumberAnswer(0);
     query.SetNumberAuthority(0);
     query.SetNumberAdditionalRR(0);
-    DNSQuestion question;
+    Botcraft::DNSQuestion question;
     // SRV type
     question.SetTypeCode(33);
     question.SetClassCode(1);
@@ -121,14 +121,14 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
     size_t remaining = len;
 
     // Read answer
-    DNSMessage answer;
+    Botcraft::DNSMessage answer;
     answer.Read(iter, remaining);
 
     // If there is an answer and it's a SRV one (as it should be)
     if (answer.GetNumberAnswer() > 0
         && answer.GetAnswers()[0].GetTypeCode() == 0x21)
     {
-        DNSSrvData data;
+        Botcraft::DNSSrvData data;
         auto iter2 = answer.GetAnswers()[0].GetRData().begin();
         size_t len2 = answer.GetAnswers()[0].GetRDLength();
         data.Read(iter2, len2);

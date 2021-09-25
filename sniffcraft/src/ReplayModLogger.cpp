@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 
 #include <protocolCraft/MessageFactory.hpp>
 #include <protocolCraft/Handler.hpp>
@@ -120,7 +121,7 @@ void ReplayModLogger::TryStart(const std::string& conf_path)
     std::ifstream file;
 
     bool error = conf_path == "";
-    picojson::value json;
+    nlohmann::json json;
 
     if (!error)
     {
@@ -136,21 +137,12 @@ void ReplayModLogger::TryStart(const std::string& conf_path)
             file.close();
 
             ss >> json;
-            std::string err = picojson::get_last_error();
 
-            if (!err.empty())
+
+            if (!json.is_object())
             {
-                std::cerr << "Error parsing conf file at " << conf_path << ".\n";
-                std::cerr << err << "\n" << std::endl;
+                std::cerr << "Error parsing conf file at " << conf_path << "." << std::endl;
                 error = true;
-            }
-            if (!error)
-            {
-                if (!json.is<picojson::object>())
-                {
-                    std::cerr << "Error parsing conf file at " << conf_path << "." << std::endl;
-                    error = true;
-                }
             }
         }
     }
@@ -161,9 +153,7 @@ void ReplayModLogger::TryStart(const std::string& conf_path)
         return;
     }
 
-    const picojson::value::object& obj = json.get<picojson::object>();
-    auto log_to_replay_file = obj.find("LogToReplay");
-    if (log_to_replay_file != obj.end() && log_to_replay_file->second.get<bool>())
+    if (json.contains("LogToReplay") && json["LogToReplay"].get<bool>())
     {
         is_running = true;
         log_thread = std::thread(&ReplayModLogger::LogConsume, this);
@@ -181,7 +171,7 @@ void ReplayModLogger::SaveReplayMetadataFile() const
              << "\"date\":" << std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() << ","
              << "\"fileFormat\":\"MCPR\"," 
              << "\"fileFormatVersion\":14," 
-             << "\"protocol\":" << PROTOCOL_VERSION << ","
+             << "\"protocol\":\"" << PROTOCOL_VERSION << "\","
              << "\"generator\":\"SniffCraft\"}";
     metadata.close();
 }

@@ -1,5 +1,6 @@
 #include "sniffcraft/Logger.hpp"
 
+#include <iostream>
 #include <sstream>
 #include <iomanip>
 
@@ -109,7 +110,7 @@ void Logger::LogConsume()
             output << item.msg->GetName();
             if (is_detailed)
             {
-                output << "\n" << item.msg->Serialize().serialize(true);
+                output << "\n" << item.msg->Serialize().dump(4);
             }
 
             const std::string output_str = output.str();
@@ -146,7 +147,7 @@ void Logger::LoadConfig(const std::string& path)
     std::ifstream file;
 
     bool error = path == "";
-    picojson::value json;
+    nlohmann::json json;
 
     if (!error)
     {
@@ -162,21 +163,11 @@ void Logger::LoadConfig(const std::string& path)
             file.close();
 
             ss >> json;
-            std::string err = picojson::get_last_error();
 
-            if (!err.empty())
+            if (!json.is_object())
             {
-                std::cerr << "Error parsing conf file at " << path << ".\n";
-                std::cerr << err << "\n" << std::endl;
+                std::cerr << "Error parsing conf file at " << path << "." << std::endl;
                 error = true;
-            }
-            if (!error)
-            {
-                if (!json.is<picojson::object>())
-                {
-                    std::cerr << "Error parsing conf file at " << path << "." << std::endl;
-                    error = true;
-                }
             }
         }
     }
@@ -194,145 +185,137 @@ void Logger::LoadConfig(const std::string& path)
         {"Play", ProtocolCraft::ConnectionState::Play}
     };
 
-    const picojson::value::object& obj = json.get<picojson::object>();
-
     log_to_console = false;
-    auto log_to_console_value = obj.find("LogToConsole");
-    if (log_to_console_value == obj.end())
+
+    if (!json.contains("LogToConsole"))
     {
         log_to_console = false;
     }
     else
     {
-        log_to_console = log_to_console_value->second.get<bool>();
+        log_to_console = json["LogToConsole"].get<bool>();
     }
 
     for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
     {
-        auto it2 = obj.find(it->first);
-        if (it2 != obj.end())
+        if (json.contains(it->first))
         {
-            LoadPacketsFromJson(it2->second, it->second);
+            LoadPacketsFromJson(json[it->first], it->second);
         }
         else
         {
-            const picojson::value null_value = picojson::value();
+            const nlohmann::json null_value = nlohmann::json();
             LoadPacketsFromJson(null_value, it->second);
         }
     }
 }
 
-void Logger::LoadPacketsFromJson(const picojson::value& value, const ProtocolCraft::ConnectionState connection_state)
+void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraft::ConnectionState connection_state)
 {
     ignored_packets[{connection_state, Origin::Client}] = std::set<int>();
     ignored_packets[{connection_state, Origin::Server}] = std::set<int>();
     detailed_packets[{connection_state, Origin::Client}] = std::set<int>();
     detailed_packets[{connection_state, Origin::Server}] = std::set<int>();
 
-    if (value.is<picojson::null>())
+    if (value.is_null())
     {
         return;
     }
 
-    if (value.contains("ignored_clientbound"))
+    if (value.contains("ignored_clientbound") && value["ignored_clientbound"].is_array())
     {
-        const picojson::object& object2 = value.get<picojson::object>();
-        if (object2.find("ignored_clientbound") != object2.end() && object2.at("ignored_clientbound").is<picojson::array>())
+        const nlohmann::json& ignored = value["ignored_clientbound"];
+        for (auto it = ignored.begin(); it != ignored.end(); ++it)
         {
-            const picojson::array& ignored = object2.at("ignored_clientbound").get<picojson::array>();
-            for (auto i = ignored.begin(); i != ignored.end(); i++)
+            if (it->is_number_integer())
             {
-                if (i->is<double>())
+                ignored_packets[{connection_state, Origin::Server}].insert(it->get<int>());
+            }
+            else if (it->is_string())
+            {
+                // Search for the matching id
+                for (int j = 0; j < 100; ++j)
                 {
-                    ignored_packets[{connection_state, Origin::Server}].insert(i->get<double>());
-                }
-                else if (i->is<std::string>())
-                {
-                    for (int j = 0; j < 100; ++j)
+                    auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
+                    if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
-                        if (msg && msg->GetName() == i->get<std::string>())
-                        {
-                            ignored_packets[{connection_state, Origin::Server}].insert(j);
-                        }
+                        ignored_packets[{connection_state, Origin::Server}].insert(j);
+                        break;
                     }
                 }
             }
         }
     }
-    if (value.contains("ignored_serverbound"))
+
+    if (value.contains("ignored_serverbound") && value["ignored_serverbound"].is_array())
     {
-        const picojson::object& object2 = value.get<picojson::object>();
-        if (object2.find("ignored_serverbound") != object2.end() && object2.at("ignored_serverbound").is<picojson::array>())
+        const nlohmann::json& ignored = value["ignored_serverbound"];
+        for (auto it = ignored.begin(); it != ignored.end(); ++it)
         {
-            const picojson::array& ignored = object2.at("ignored_serverbound").get<picojson::array>();
-            for (auto i = ignored.begin(); i != ignored.end(); i++)
+            if (it->is_number_integer())
             {
-                if (i->is<double>())
+                ignored_packets[{connection_state, Origin::Client}].insert(it->get<int>());
+            }
+            else if (it->is_string())
+            {
+                // Search for the matching id
+                for (int j = 0; j < 100; ++j)
                 {
-                    ignored_packets[{connection_state, Origin::Client}].insert(i->get<double>());
-                }
-                else if (i->is<std::string>())
-                {
-                    for (int j = 0; j < 100; ++j)
+                    auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
+                    if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
-                        if (msg && msg->GetName() == i->get<std::string>())
-                        {
-                            ignored_packets[{connection_state, Origin::Client}].insert(j);
-                        }
+                        ignored_packets[{connection_state, Origin::Client}].insert(j);
+                        break;
                     }
                 }
             }
         }
     }
-    if (value.contains("detailed_clientbound"))
+
+    if (value.contains("detailed_clientbound") && value["detailed_clientbound"].is_array())
     {
-        const picojson::object& object2 = value.get<picojson::object>();
-        if (object2.find("detailed_clientbound") != object2.end() && object2.at("detailed_clientbound").is<picojson::array>())
+        const nlohmann::json& detailed = value["detailed_clientbound"];
+        for (auto it = detailed.begin(); it != detailed.end(); ++it)
         {
-            const picojson::array& ignored = object2.at("detailed_clientbound").get<picojson::array>();
-            for (auto i = ignored.begin(); i != ignored.end(); i++)
+            if (it->is_number_integer())
             {
-                if (i->is<double>())
+                detailed_packets[{connection_state, Origin::Server}].insert(it->get<int>());
+            }
+            else if (it->is_string())
+            {
+                // Search for the matching id
+                for (int j = 0; j < 100; ++j)
                 {
-                    detailed_packets[{connection_state, Origin::Client}].insert(i->get<double>());
-                }
-                else if (i->is<std::string>())
-                {
-                    for (int j = 0; j < 100; ++j)
+                    auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
+                    if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
-                        if (msg && msg->GetName() == i->get<std::string>())
-                        {
-                            detailed_packets[{connection_state, Origin::Server}].insert(j);
-                        }
+                        detailed_packets[{connection_state, Origin::Server}].insert(j);
+                        break;
                     }
                 }
             }
         }
     }
-    if (value.contains("detailed_serverbound"))
+
+    if (value.contains("detailed_serverbound") && value["detailed_serverbound"].is_array())
     {
-        const picojson::object& object2 = value.get<picojson::object>();
-        if (object2.find("detailed_serverbound") != object2.end() && object2.at("detailed_serverbound").is<picojson::array>())
+        const nlohmann::json& detailed = value["detailed_serverbound"];
+        for (auto it = detailed.begin(); it != detailed.end(); ++it)
         {
-            const picojson::array& ignored = object2.at("detailed_serverbound").get<picojson::array>();
-            for (auto i = ignored.begin(); i != ignored.end(); i++)
+            if (it->is_number_integer())
             {
-                if (i->is<double>())
+                detailed_packets[{connection_state, Origin::Client}].insert(it->get<int>());
+            }
+            else if (it->is_string())
+            {
+                // Search for the matching id
+                for (int j = 0; j < 100; ++j)
                 {
-                    detailed_packets[{connection_state, Origin::Client}].insert(i->get<double>());
-                }
-                else if (i->is<std::string>())
-                {
-                    for (int j = 0; j < 100; ++j)
+                    auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
+                    if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
-                        if (msg && msg->GetName() == i->get<std::string>())
-                        {
-                            detailed_packets[{connection_state, Origin::Client}].insert(j);
-                        }
+                        detailed_packets[{connection_state, Origin::Client}].insert(j);
+                        break;
                     }
                 }
             }

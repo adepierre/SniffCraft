@@ -10,10 +10,10 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/ReplayModLogger.hpp
     include/sniffcraft/server.hpp
     
-    include/sniffcraft/DNS/DNSMessage.hpp
-    include/sniffcraft/DNS/DNSQuestion.hpp
-    include/sniffcraft/DNS/DNSResourceRecord.hpp
-    include/sniffcraft/DNS/DNSSrvData.hpp
+    ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSMessage.hpp
+    ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSQuestion.hpp
+    ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSResourceRecord.hpp
+    ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSSrvData.hpp
     
     include/sniffcraft/Zip/CRC32.hpp
     include/sniffcraft/Zip/DosTime.hpp
@@ -37,6 +37,7 @@ if(MSVC)
     foreach(source IN LISTS sniffcraft_PUBLIC_HDR)
         get_filename_component(source_path_header "${source}" PATH)
         string(REPLACE "include/sniffcraft" "Header Files/public" source_path_header "${source_path_header}")
+        string(REPLACE "../3rdparty/botcraft/botcraft/private_include/botcraft/Network" "Header Files/public" source_path_header "${source_path_header}")
         string(REPLACE "/" "\\" source_path_msvc "${source_path_header}")
         source_group("${source_path_msvc}" FILES "${source}")
     endforeach()
@@ -75,6 +76,8 @@ else()
 endif(MSVC)
 
 target_include_directories(sniffcraft PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(sniffcraft PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include)
+target_include_directories(sniffcraft PUBLIC ${JSON_INCLUDE_DIR})
 
 # Add Asio
 target_link_libraries(sniffcraft PUBLIC asio)

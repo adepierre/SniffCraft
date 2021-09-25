@@ -6,8 +6,6 @@
 #include <protocolCraft/enums.hpp>
 #include <protocolCraft/Message.hpp>
 
-#include <picojson/picojson.h>
-
 #include <thread>
 #include <mutex>
 #include <fstream>

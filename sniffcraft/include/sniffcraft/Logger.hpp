@@ -6,7 +6,7 @@
 #include <protocolCraft/enums.hpp>
 #include <protocolCraft/Message.hpp>
 
-#include <picojson/picojson.h>
+#include <nlohmann/json.hpp>
 
 #include <thread>
 #include <mutex>
@@ -28,7 +28,7 @@ public:
 private:
     void LogConsume();
     void LoadConfig(const std::string& path);
-    void LoadPacketsFromJson(const picojson::value& value, const ProtocolCraft::ConnectionState connection_state);
+    void LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraft::ConnectionState connection_state);
 
 private:
     std::chrono::time_point<std::chrono::system_clock> start_time;

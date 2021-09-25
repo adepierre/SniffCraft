@@ -7,8 +7,8 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Add Asio
 include(${CMAKE_SOURCE_DIR}/cmake/asio.cmake)
 
-# Add picoJson
-include(${CMAKE_SOURCE_DIR}/cmake/picoJson.cmake)
+# Add json
+include(${CMAKE_SOURCE_DIR}/cmake/json.cmake)
 
 # Add Zlib
 include(${CMAKE_SOURCE_DIR}/cmake/zlib.cmake)
