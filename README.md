@@ -50,7 +50,7 @@ As both the client and the server must share the same public key when authentica
 You don't have to install any dependency to build SniffCraft, everything that is not already on your system will be automatically downloaded and locally built during the build process.
 
 - [asio](https://think-async.com/Asio/)
-- [picoJson](https://github.com/kazuho/picojson)
+- [nlohmann json](https://github.com/nlohmann/json)
 - [zlib](https://github.com/madler/zlib)
 - [botcraft](https://github.com/adepierre/botcraft) (actually, I'm only using protocolCraft lib, but as I haven't separated it from my Botcraft repo, everything is downloaded)
 
