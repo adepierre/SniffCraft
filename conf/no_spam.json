@@ -1,6 +1,9 @@
 {
     "LogToConsole": true,
     "LogToReplay": false,
+    "Online": false,
+    "MojangLogin": "",
+    "MojangPassword": "",
     "Handshaking": {
         "ignored_clientbound" : [
             

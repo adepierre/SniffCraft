@@ -1,8 +1,10 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.10)
 
 project(SniffCraft)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+option(WITH_ENCRYPTION "Activate for online mode support" ON)
 
 # Add Asio
 include(${CMAKE_SOURCE_DIR}/cmake/asio.cmake)
@@ -13,7 +15,12 @@ include(${CMAKE_SOURCE_DIR}/cmake/json.cmake)
 # Add Zlib
 include(${CMAKE_SOURCE_DIR}/cmake/zlib.cmake)
 
-# Add Botcraft
+# Add OpenSSL
+if(WITH_ENCRYPTION)
+    include(${CMAKE_SOURCE_DIR}/cmake/openssl.cmake)
+endif(WITH_ENCRYPTION)
+
+# Add ProtocolCraft
 include(${CMAKE_SOURCE_DIR}/cmake/botcraft.cmake)
 
 # Check pthreads

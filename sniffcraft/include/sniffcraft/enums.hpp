@@ -1,7 +1,9 @@
 #pragma once
 
-enum class Origin
+enum class Endpoint
 {
     Server,
-    Client
+    Client,
+    SniffcraftToServer,
+    SniffcraftToClient
 };

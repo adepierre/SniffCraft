@@ -21,10 +21,10 @@ const std::vector<std::string> SplitString(const std::string& s, const char deli
 }
 
 Server::Server(asio::io_context& io_context, const unsigned short client_port,
-    const std::string& server_address, const std::string &logconf_path_) : 
+    const std::string& server_address, const std::string &conf_path_) : 
     io_context_(io_context),
     acceptor_(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), client_port)),
-    logconf_path(logconf_path_)
+    conf_path(conf_path_)
 {
     ResolveIpPortFromAddress(server_address);
     start_accept();
@@ -32,7 +32,7 @@ Server::Server(asio::io_context& io_context, const unsigned short client_port,
 
 void Server::start_accept()
 {
-    MinecraftProxy* new_proxy = new MinecraftProxy(io_context_, logconf_path);
+    MinecraftProxy* new_proxy = new MinecraftProxy(io_context_, conf_path);
     acceptor_.async_accept(new_proxy->ClientSocket(),
         std::bind(&Server::handle_accept, this, new_proxy,
             std::placeholders::_1));

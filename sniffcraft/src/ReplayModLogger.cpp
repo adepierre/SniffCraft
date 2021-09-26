@@ -37,7 +37,7 @@ ReplayModLogger::~ReplayModLogger()
     }
 }
 
-void ReplayModLogger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Origin origin)
+void ReplayModLogger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin)
 {
     if (!is_running)
     {
@@ -91,7 +91,7 @@ void ReplayModLogger::LogConsume()
             sec -= min * 60;
             min -= hours * 60;
 
-            if (item.origin == Origin::Server
+            if ((item.origin == Endpoint::Server || item.origin == Endpoint::SniffcraftToClient)
                 && (item.connection_state == ProtocolCraft::ConnectionState::Play ||
                     (item.connection_state == ProtocolCraft::ConnectionState::Login && item.msg->GetId() == 0x02)))
             {

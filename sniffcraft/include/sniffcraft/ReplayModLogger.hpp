@@ -21,7 +21,7 @@ class ReplayModLogger
 public:
     ReplayModLogger(const std::string &conf_path);
     ~ReplayModLogger();
-    void Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Origin origin);
+    void Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin);
     void SetServerName(const std::string& server_name_);
 
 private:

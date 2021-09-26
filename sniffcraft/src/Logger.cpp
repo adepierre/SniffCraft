@@ -35,7 +35,7 @@ Logger::~Logger()
     }
 }
 
-void Logger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Origin origin)
+void Logger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
     if (!log_file.is_open())
@@ -84,7 +84,7 @@ void Logger::LogConsume()
             if (item.msg == nullptr)
             {
                 output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
-                    << (item.origin == Origin::Server ? "[S --> C] " : "[C --> S] ");
+                    << OriginToString(item.origin) << " ";
                 output << "UNKNOWN OR WRONGLY PARSED MESSAGE";
                 const std::string output_str = output.str();
                 log_file << output_str << std::endl;
@@ -95,18 +95,18 @@ void Logger::LogConsume()
                 continue;
             }
 
-            const std::set<int>& ignored_set = ignored_packets[{item.connection_state, item.origin}];
+            const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
             const bool is_ignored = ignored_set.find(item.msg->GetId()) != ignored_set.end();
             if (is_ignored)
             {
                 continue;
             }
 
-            const std::set<int>& detailed_set = detailed_packets[{item.connection_state, item.origin}];
+            const std::set<int>& detailed_set = detailed_packets[{item.connection_state, SimpleOrigin(item.origin)}];
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
 
             output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
-                << (item.origin == Origin::Server ? "[S --> C] " : "[C --> S] ");
+                << OriginToString(item.origin) << " ";
             output << item.msg->GetName();
             if (is_detailed)
             {
@@ -212,10 +212,10 @@ void Logger::LoadConfig(const std::string& path)
 
 void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraft::ConnectionState connection_state)
 {
-    ignored_packets[{connection_state, Origin::Client}] = std::set<int>();
-    ignored_packets[{connection_state, Origin::Server}] = std::set<int>();
-    detailed_packets[{connection_state, Origin::Client}] = std::set<int>();
-    detailed_packets[{connection_state, Origin::Server}] = std::set<int>();
+    ignored_packets[{connection_state, Endpoint::Client}] = std::set<int>();
+    ignored_packets[{connection_state, Endpoint::Server}] = std::set<int>();
+    detailed_packets[{connection_state, Endpoint::Client}] = std::set<int>();
+    detailed_packets[{connection_state, Endpoint::Server}] = std::set<int>();
 
     if (value.is_null())
     {
@@ -229,7 +229,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
         {
             if (it->is_number_integer())
             {
-                ignored_packets[{connection_state, Origin::Server}].insert(it->get<int>());
+                ignored_packets[{connection_state, Endpoint::Server}].insert(it->get<int>());
             }
             else if (it->is_string())
             {
@@ -239,7 +239,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        ignored_packets[{connection_state, Origin::Server}].insert(j);
+                        ignored_packets[{connection_state, Endpoint::Server}].insert(j);
                         break;
                     }
                 }
@@ -254,7 +254,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
         {
             if (it->is_number_integer())
             {
-                ignored_packets[{connection_state, Origin::Client}].insert(it->get<int>());
+                ignored_packets[{connection_state, Endpoint::Client}].insert(it->get<int>());
             }
             else if (it->is_string())
             {
@@ -264,7 +264,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        ignored_packets[{connection_state, Origin::Client}].insert(j);
+                        ignored_packets[{connection_state, Endpoint::Client}].insert(j);
                         break;
                     }
                 }
@@ -279,7 +279,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
         {
             if (it->is_number_integer())
             {
-                detailed_packets[{connection_state, Origin::Server}].insert(it->get<int>());
+                detailed_packets[{connection_state, Endpoint::Server}].insert(it->get<int>());
             }
             else if (it->is_string())
             {
@@ -289,7 +289,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        detailed_packets[{connection_state, Origin::Server}].insert(j);
+                        detailed_packets[{connection_state, Endpoint::Server}].insert(j);
                         break;
                     }
                 }
@@ -304,7 +304,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
         {
             if (it->is_number_integer())
             {
-                detailed_packets[{connection_state, Origin::Client}].insert(it->get<int>());
+                detailed_packets[{connection_state, Endpoint::Client}].insert(it->get<int>());
             }
             else if (it->is_string())
             {
@@ -314,11 +314,44 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
                     {
-                        detailed_packets[{connection_state, Origin::Client}].insert(j);
+                        detailed_packets[{connection_state, Endpoint::Client}].insert(j);
                         break;
                     }
                 }
             }
         }
+    }
+}
+
+std::string Logger::OriginToString(const Endpoint origin) const
+{
+    switch (origin)
+    {
+    case Endpoint::Client:
+        return "[C --> S]";
+    case Endpoint::Server:
+        return "[S --> C]";
+    case Endpoint::SniffcraftToClient:
+        return "[(SC) --> C]";
+    case Endpoint::SniffcraftToServer:
+        return "[(SC) --> S]";
+    default:
+        return "";
+    }
+}
+
+Endpoint Logger::SimpleOrigin(const Endpoint origin) const
+{
+    switch (origin)
+    {
+    case Endpoint::Client:
+    case Endpoint::Server:
+        return origin;
+    case Endpoint::SniffcraftToClient:
+        return Endpoint::Server;
+    case Endpoint::SniffcraftToServer:
+        return Endpoint::Client;
+    default:
+        return Endpoint::Client;
     }
 }

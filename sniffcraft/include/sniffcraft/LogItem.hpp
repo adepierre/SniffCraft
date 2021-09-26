@@ -13,5 +13,5 @@ struct LogItem
     std::shared_ptr<ProtocolCraft::Message> msg;
     std::chrono::time_point<std::chrono::system_clock> date;
     ProtocolCraft::ConnectionState connection_state;
-    Origin origin;
+    Endpoint origin;
 };

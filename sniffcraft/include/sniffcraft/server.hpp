@@ -8,7 +8,7 @@ class Server
 {
 public:
     Server(asio::io_context& io_context, const unsigned short client_port,
-        const std::string& server_address, const std::string& logconf_path_);
+        const std::string& server_address, const std::string& conf_path_);
 
 private:
     void start_accept();
@@ -22,6 +22,6 @@ private:
     std::string server_ip_;
     unsigned short server_port_;
 
-    std::string logconf_path;
+    std::string conf_path;
 };
 
