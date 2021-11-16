@@ -65,10 +65,10 @@ You don't have to install any dependency to build SniffCraft, everything that is
 To build for the latest game version, with encryption support:
 ```
 git clone https://github.com/adepierre/SniffCraft.git
-cd sniffcraft
+cd SniffCraft
 mkdir build
 cd build
-cmake -DGAME_VERSION=latest -DWITH_ENCRYPTION ..
+cmake -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON ..
 make all
 ```
 
