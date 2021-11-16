@@ -4,6 +4,9 @@
 #include <botcraft/Network/DNS/DNSMessage.hpp>
 #include <botcraft/Network/DNS/DNSSrvData.hpp>
 
+#include <botcraft/Network/AESEncrypter.hpp>
+#include <botcraft/Network/Authentifier.hpp>
+
 #include <functional>
 #include <iostream>
 #include <utility>
