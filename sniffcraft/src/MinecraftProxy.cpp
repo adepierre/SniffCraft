@@ -418,7 +418,7 @@ void MinecraftProxy::LoadConfig(const std::string& conf_path)
         if (mojang_login.empty() || mojang_pwd.empty())
         {
             std::cout << "Empty mojang credentials, trying to authenticate using Microsoft account" << std::endl;
-            if (!authentifier->AuthMicrosoft())
+            if (!authentifier->AuthMicrosoft(mojang_login))
             {
                 std::cerr << "Error trying to authenticate with Microsoft account" << std::endl;
                 throw std::runtime_error("Error trying to authenticate with Microsoft account");

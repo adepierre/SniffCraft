@@ -7,7 +7,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.17.1
+- Supported minecraft versions: all official releases from 1.12.2 to 1.18.1
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 - Online mode is supported, with both Mojang and Microsoft accounts
@@ -48,7 +48,7 @@ Encryption is supported by moving the authentication step from the client to Sni
 
 To connect to a server in online mode, you need a valid Minecraft account (either Mojang or Microsoft). You **can** use the same account for your client and for Sniffcraft, as the client is considered offline.
 
-There are three options in the conf file regarding authentication. ``Online`` must be true to connect to a server with authentication activated. If ``MojangLogin`` and ``MojangPassword`` are set, SniffCraft will try to authenticate with these, otherwise, it will prompt you instructions on the console to log in with a Microsoft account (only the first time, will use cached credentials for the next ones).
+There are three options in the conf file regarding authentication. ``Online`` must be true to connect to a server with authentication activated. If ``MojangLogin`` and ``MojangPassword`` are set, SniffCraft will try to authenticate with these, otherwise, it will prompt you instructions on the console to log in with a Microsoft account (only the first time, will use cached credentials for the next ones, you can cache multiple Microsoft accounts using different random ``MojangLogin``).
 
 ## Dependencies
 
