@@ -280,11 +280,6 @@ void MinecraftProxy::ParsePacket(const Endpoint from, std::vector<unsigned char>
         msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(minecraftID, connection_state);
     }
 
-    // Log the message
-    logger.Log(msg, connection_state, from);
-    replay_logger.Log(msg, connection_state, from);
-
-    // React to the message if necessary
     if (msg != nullptr)
     {
         bool error_parsing = false;
@@ -298,8 +293,14 @@ void MinecraftProxy::ParsePacket(const Endpoint from, std::vector<unsigned char>
                 "PARSING EXCEPTION: " << ex.what() << " || " << msg->GetName() << std::endl;
             error_parsing = true;
         }
+        
         if (!error_parsing)
         {
+            // Log the message
+            logger.Log(msg, connection_state, from);
+            replay_logger.Log(msg, connection_state, from);
+
+            // React to the message if necessary
             msg->Dispatch(this);
         }
     }
