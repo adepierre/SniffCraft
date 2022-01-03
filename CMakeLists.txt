@@ -42,4 +42,7 @@ message(STATUS "Selected game version: " ${GAME_VERSION} " || Protocol: " ${PROT
 
 
 add_subdirectory(3rdparty/botcraft/protocolCraft)
+
+set_target_properties(protocolCraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/lib")
+
 add_subdirectory(sniffcraft)
