@@ -6,3 +6,5 @@ if(RES_LEN EQUAL 0)
     message(STATUS "Botcraft not found, cloning it...")
     execute_process(COMMAND git submodule update --init -- 3rdparty/botcraft WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
+
+set(BOTCRAFT_OUTPUT_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Base output build path for protocolCraft")
