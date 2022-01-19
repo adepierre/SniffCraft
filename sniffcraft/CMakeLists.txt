@@ -82,9 +82,9 @@ else()
     set_target_properties(sniffcraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib")
 endif(MSVC)
 
-target_include_directories(sniffcraft PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(sniffcraft PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include)
-target_include_directories(sniffcraft PUBLIC ${JSON_INCLUDE_DIR})
+target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include")
+target_include_directories(sniffcraft PUBLIC "${JSON_INCLUDE_DIR}")
 
 set_property(TARGET sniffcraft PROPERTY CXX_STANDARD 17)
 

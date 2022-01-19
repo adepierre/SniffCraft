@@ -7,21 +7,21 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(WITH_ENCRYPTION "Activate for online mode support" ON)
 
 # Add Asio
-include(${CMAKE_SOURCE_DIR}/cmake/asio.cmake)
+include("${CMAKE_SOURCE_DIR}/cmake/asio.cmake")
 
 # Add json
-include(${CMAKE_SOURCE_DIR}/cmake/json.cmake)
+include("${CMAKE_SOURCE_DIR}/cmake/json.cmake")
 
 # Add Zlib
-include(${CMAKE_SOURCE_DIR}/cmake/zlib.cmake)
+include("${CMAKE_SOURCE_DIR}/cmake/zlib.cmake")
 
 # Add OpenSSL
 if(WITH_ENCRYPTION)
-    include(${CMAKE_SOURCE_DIR}/cmake/openssl.cmake)
+    include("${CMAKE_SOURCE_DIR}/cmake/openssl.cmake")
 endif(WITH_ENCRYPTION)
 
 # Add ProtocolCraft
-include(${CMAKE_SOURCE_DIR}/cmake/botcraft.cmake)
+include("${CMAKE_SOURCE_DIR}/cmake/botcraft.cmake")
 
 # Check pthreads
 find_package(Threads)
