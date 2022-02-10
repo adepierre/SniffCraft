@@ -18,6 +18,8 @@ set(sniffcraft_PUBLIC_HDR
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/Authentifier.hpp
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/AESEncrypter.hpp
     
+    ../3rdparty/botcraft/botcraft/include/botcraft/Utilities/Logger.hpp
+    
     include/sniffcraft/Zip/CRC32.hpp
     include/sniffcraft/Zip/DosTime.hpp
     include/sniffcraft/Zip/ZeptoZip.hpp
@@ -36,6 +38,7 @@ set(sniffcraft_SRC
     
     ../3rdparty/botcraft/botcraft/src/Network/Authentifier.cpp
     ../3rdparty/botcraft/botcraft/src/Network/AESEncrypter.cpp
+    ../3rdparty/botcraft/botcraft/src/Utilities/Logger.cpp
 )
 
 # To have a nice files structure in Visual Studio
@@ -43,6 +46,7 @@ if(MSVC)
     foreach(source IN LISTS sniffcraft_PUBLIC_HDR)
         get_filename_component(source_path_header "${source}" PATH)
         string(REPLACE "../3rdparty/botcraft/botcraft/private_include/botcraft/Network" "Header Files/public/botcraft" source_path_header "${source_path_header}")
+        string(REPLACE "../3rdparty/botcraft/botcraft/include/botcraft/Utilities" "Header Files/public/botcraft" source_path_header "${source_path_header}")
         string(REPLACE "include/sniffcraft" "Header Files/public" source_path_header "${source_path_header}")
         string(REPLACE "/" "\\" source_path_msvc "${source_path_header}")
         source_group("${source_path_msvc}" FILES "${source}")
@@ -50,7 +54,7 @@ if(MSVC)
 
     foreach(source IN LISTS sniffcraft_SRC)
         get_filename_component(source_path "${source}" PATH)
-        string(REPLACE "../3rdparty/botcraft/botcraft/src/Network" "Source Files/botcraft" source_path "${source_path}")
+        string(REPLACE "../3rdparty/botcraft/botcraft/src" "Source Files/botcraft" source_path "${source_path}")
         string(REPLACE "src" "Source Files" source_path "${source_path}")
         string(REPLACE "/" "\\" source_path_msvc "${source_path}")
         source_group("${source_path_msvc}" FILES "${source}")
@@ -84,6 +88,7 @@ endif(MSVC)
 
 target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include")
+target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/include")
 target_include_directories(sniffcraft PUBLIC "${JSON_INCLUDE_DIR}")
 
 set_property(TARGET sniffcraft PROPERTY CXX_STANDARD 17)
