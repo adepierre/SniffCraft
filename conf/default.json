@@ -1,6 +1,7 @@
 {
     "LogToConsole": false,
     "LogToReplay": false,
+    "LogRawBytes": false,
     "Online": false,
     "MojangLogin": "",
     "MojangPassword": "",

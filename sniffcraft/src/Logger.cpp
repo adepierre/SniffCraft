@@ -108,6 +108,16 @@ void Logger::LogConsume()
             output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
                 << OriginToString(item.origin) << " ";
             output << item.msg->GetName();
+            if (log_raw_bytes)
+            {
+                output << '\n';
+                std::vector<unsigned char> bytes;
+                item.msg->Write(bytes);
+                for (size_t i = 0; i < bytes.size(); ++i)
+                {
+                    output << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(bytes[i]) << (i == bytes.size() - 1 ? "" : " ");
+                }
+            }
             if (is_detailed)
             {
                 output << "\n" << item.msg->Serialize().dump(4);
@@ -194,6 +204,17 @@ void Logger::LoadConfig(const std::string& path)
     else
     {
         log_to_console = json["LogToConsole"].get<bool>();
+    }
+
+    log_raw_bytes = false;
+
+    if (!json.contains("LogRawBytes"))
+    {
+        log_raw_bytes = false;
+    }
+    else
+    {
+        log_raw_bytes = json["LogRawBytes"].get<bool>();
     }
 
     for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
