@@ -11,6 +11,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 - Online mode is supported, with both Mojang and Microsoft accounts
+- Logging raw packets at byte level
 - Configuration (which packet to log/ignore) can be changed without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
@@ -42,7 +43,7 @@ Here is an example of a captured session:
 ```
 
 
-### Encryption is now supported
+### Encryption is supported
 
 Encryption is supported by moving the authentication step from the client to Sniffcraft. This means that all the traffic from the client to Sniffcraft is not encrypted, but the traffic between Sniffcraft and the server is.
 
