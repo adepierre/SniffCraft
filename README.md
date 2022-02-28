@@ -7,7 +7,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.18.1
+- Supported minecraft versions: all official releases from 1.12.2 to 1.18.2
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 - Online mode is supported, with both Mojang and Microsoft accounts
