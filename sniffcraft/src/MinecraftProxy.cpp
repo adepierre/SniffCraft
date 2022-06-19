@@ -463,7 +463,11 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
     if (authentifier)
     {
         ProtocolCraft::ServerboundHelloPacket replacement_hello_packet;
+#if PROTOCOL_VERSION < 759
         replacement_hello_packet.SetGameProfile(authentifier->GetPlayerDisplayName());
+#else
+        replacement_hello_packet.SetName(authentifier->GetPlayerDisplayName());
+#endif
 
         const std::vector<unsigned char> replacement_bytes = PacketToBytes(replacement_hello_packet);
         client_replacement_data.insert(client_replacement_data.end(), replacement_bytes.begin(), replacement_bytes.end());
