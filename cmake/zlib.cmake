@@ -28,6 +28,21 @@ if(NOT TARGET ZLIB::ZLIB)
 	execute_process(COMMAND "cmake" "--build" "." "--target" "install" "--config" "Release" WORKING_DIRECTORY "${ZLIB_BUILD_PATH}")
 
 	# Find the freshly built library
+    
+    # From 3.24 there is a cmake option to find zlib static
+    # but before, we need to do it in a more manual way
+    if(${CMAKE_VERSION} VERSION_LESS "3.24.0")
+        set(_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+        set(CMAKE_FIND_LIBRARY_SUFFIXES "static.lib" ".a")
+    else()
+        set(ZLIB_USE_STATIC_LIBS "ON")
+    endif()
+    
 	set(ZLIB_ROOT "${ZLIB_BUILD_PATH}/install")
 	find_package(ZLIB QUIET)
+    
+    if(${CMAKE_VERSION} VERSION_LESS "3.24.0")
+        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES}) 
+        unset(_CMAKE_FIND_LIBRARY_SUFFIXES)
+    endif()
 endif()
