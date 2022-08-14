@@ -255,7 +255,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
             else if (it->is_string())
             {
                 // Search for the matching id
-                for (int j = 0; j < 100; ++j)
+                for (int j = 0; j < 150; ++j)
                 {
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
@@ -280,7 +280,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
             else if (it->is_string())
             {
                 // Search for the matching id
-                for (int j = 0; j < 100; ++j)
+                for (int j = 0; j < 150; ++j)
                 {
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
@@ -305,7 +305,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
             else if (it->is_string())
             {
                 // Search for the matching id
-                for (int j = 0; j < 100; ++j)
+                for (int j = 0; j < 150; ++j)
                 {
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
@@ -330,7 +330,7 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
             else if (it->is_string())
             {
                 // Search for the matching id
-                for (int j = 0; j < 100; ++j)
+                for (int j = 0; j < 150; ++j)
                 {
                     auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
                     if (msg && msg->GetName() == it->get<std::string>())
