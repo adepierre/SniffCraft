@@ -15,6 +15,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Configuration (which packet to log/ignore) can be changed without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
+- ⚠️ For 1.19+, can only connect to servers with property enforce-secure-profile set to false. Connection to servers with enforce-secure-profile=true is not supported (yet). ⚠️
 
 Here is an example of a captured session:
 ```javascript
@@ -89,7 +90,7 @@ server_address should match the address of the server you want to connect to, wi
 
 If ``LogToReplay`` is present and set to true in the configuration file when the session starts, all packets will also be logged in a format compatible with [replay mod](https://github.com/ReplayMod/ReplayMod). When the capture stops, you'll get a ``XXXX.mcpr`` file that can be opened by the replay mod viewer inside minecraft.
 
-Please note that the current player will **not** appear on this capture, as the replay mod artifically adds some packets to display it.
+Please note that the current player will **not** appear on this capture, as the replay mod artificially adds some packets to display it.
 
 ## License
 
