@@ -416,25 +416,13 @@ void MinecraftProxy::LoadConfig(const std::string& conf_path)
     {
         authentifier = std::make_unique<Botcraft::Authentifier>();
 
-        const std::string mojang_login = json.contains("MojangLogin") ? json["MojangLogin"].get<std::string>() : "";
-        const std::string mojang_pwd = json.contains("MojangPassword") ? json["MojangPassword"].get<std::string>() : "";
+        const std::string credentials_cache_key = json.contains("MicrosoftAccountCacheKey") ? json["MicrosoftAccountCacheKey"].get<std::string>() : "";
 
-        if (mojang_login.empty() || mojang_pwd.empty())
+        std::cout << "Trying to authenticate using Microsoft account" << std::endl;
+        if (!authentifier->AuthMicrosoft(credentials_cache_key))
         {
-            std::cout << "Empty mojang credentials, trying to authenticate using Microsoft account" << std::endl;
-            if (!authentifier->AuthMicrosoft(mojang_login))
-            {
-                std::cerr << "Error trying to authenticate with Microsoft account" << std::endl;
-                throw std::runtime_error("Error trying to authenticate with Microsoft account");
-            }
-        }
-        else
-        {
-            if (!authentifier->AuthMojang(mojang_login, mojang_pwd))
-            {
-                std::cerr << "Error trying to authenticate with Mojang account" << std::endl;
-                throw std::runtime_error("Error trying to authenticate with Mojang account");
-            }
+            std::cerr << "Error trying to authenticate with Microsoft account" << std::endl;
+            throw std::runtime_error("Error trying to authenticate with Microsoft account");
         }
     }
 #endif
@@ -476,7 +464,6 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
         key.SetTimestamp(authentifier->GetKeyTimestamp());
         key.SetKey(Botcraft::RSAToBytes(authentifier->GetPublicKey()));
         key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
-
         replacement_hello_packet.SetPublicKey(key);
 #if PROTOCOL_VERSION > 759
         replacement_hello_packet.SetProfileId(authentifier->GetPlayerUUID());
