@@ -19,6 +19,7 @@ set(sniffcraft_PUBLIC_HDR
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/AESEncrypter.hpp
     
     ../3rdparty/botcraft/botcraft/include/botcraft/Utilities/Logger.hpp
+    ../3rdparty/botcraft/botcraft/private_include/botcraft/Utilities/StringUtilities.hpp
     
     include/sniffcraft/Zip/CRC32.hpp
     include/sniffcraft/Zip/DosTime.hpp
@@ -39,6 +40,7 @@ set(sniffcraft_SRC
     ../3rdparty/botcraft/botcraft/src/Network/Authentifier.cpp
     ../3rdparty/botcraft/botcraft/src/Network/AESEncrypter.cpp
     ../3rdparty/botcraft/botcraft/src/Utilities/Logger.cpp
+    ../3rdparty/botcraft/botcraft/src/Utilities/StringUtilities.cpp
 )
 
 # To have a nice files structure in Visual Studio
@@ -46,6 +48,7 @@ if(MSVC)
     foreach(source IN LISTS sniffcraft_PUBLIC_HDR)
         get_filename_component(source_path_header "${source}" PATH)
         string(REPLACE "../3rdparty/botcraft/botcraft/private_include/botcraft/Network" "Header Files/public/botcraft" source_path_header "${source_path_header}")
+        string(REPLACE "../3rdparty/botcraft/botcraft/private_include/botcraft/Utilities" "Header Files/public/botcraft" source_path_header "${source_path_header}")
         string(REPLACE "../3rdparty/botcraft/botcraft/include/botcraft/Utilities" "Header Files/public/botcraft" source_path_header "${source_path_header}")
         string(REPLACE "include/sniffcraft" "Header Files/public" source_path_header "${source_path_header}")
         string(REPLACE "/" "\\" source_path_msvc "${source_path_header}")

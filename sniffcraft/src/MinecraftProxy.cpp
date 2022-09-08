@@ -6,6 +6,9 @@
 
 #include <botcraft/Network/AESEncrypter.hpp>
 #include <botcraft/Network/Authentifier.hpp>
+#if PROTOCOL_VERSION > 758
+#include <botcraft/Utilities/StringUtilities.hpp>
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -444,7 +447,7 @@ void MinecraftProxy::Handle(ProtocolCraft::Message& msg)
 
 void MinecraftProxy::Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg)
 {
-    connection_state = (ProtocolCraft::ConnectionState)msg.GetIntention();
+    connection_state = static_cast<ProtocolCraft::ConnectionState>(msg.GetIntention());
 
     ProtocolCraft::ServerboundClientIntentionPacket replacement_intention_packet;
     replacement_intention_packet.SetIntention(msg.GetIntention());
@@ -459,7 +462,8 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg
 void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
 {
 #ifdef USE_ENCRYPTION
-    // Make sure we use the name we auth with in the hello packet
+    // Make sure we use the name and the signature key
+    // of the profile we auth with
     if (authentifier)
     {
         ProtocolCraft::ServerboundHelloPacket replacement_hello_packet;
@@ -467,6 +471,16 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
         replacement_hello_packet.SetGameProfile(authentifier->GetPlayerDisplayName());
 #else
         replacement_hello_packet.SetName(authentifier->GetPlayerDisplayName());
+
+        ProtocolCraft::ProfilePublicKey key;
+        key.SetTimestamp(authentifier->GetKeyTimestamp());
+        key.SetKey(Botcraft::RSAToBytes(authentifier->GetPublicKey()));
+        key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
+
+        replacement_hello_packet.SetPublicKey(key);
+#if PROTOCOL_VERSION > 759
+        replacement_hello_packet.SetProfileId(authentifier->GetPlayerUUID());
+#endif
 #endif
 
         const std::vector<unsigned char> replacement_bytes = PacketToBytes(replacement_hello_packet);
@@ -497,17 +511,35 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 
     std::unique_ptr<Botcraft::AESEncrypter> encrypter_ = std::make_unique<Botcraft::AESEncrypter>();
 
-    std::vector<unsigned char> encrypted_token;
-    std::vector<unsigned char> encrypted_shared_secret;
     std::vector<unsigned char> raw_shared_secret;
+    std::vector<unsigned char> encrypted_shared_secret;
 
-    encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(), raw_shared_secret, encrypted_token, encrypted_shared_secret);
+#if PROTOCOL_VERSION < 759
+    std::vector<unsigned char> encrypted_nonce;
+    encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(),
+        raw_shared_secret, encrypted_nonce, encrypted_shared_secret);
+#else
+    std::vector<unsigned char> salted_nonce_signature;
+    long long int salt;
+    encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(), authentifier->GetPrivateKey(),
+        raw_shared_secret, encrypted_shared_secret,
+        salt, salted_nonce_signature);
+#endif
 
     authentifier->JoinServer(msg.GetServerID(), raw_shared_secret, msg.GetPublicKey());
 
     std::shared_ptr<ProtocolCraft::ServerboundKeyPacket> response_msg = std::make_shared<ProtocolCraft::ServerboundKeyPacket>();
     response_msg->SetKeyBytes(encrypted_shared_secret);
+#if PROTOCOL_VERSION < 759
+    // Pre-1.19 behaviour, send encrypted nonce
     response_msg->SetNonce(encrypted_token);
+#else
+    // 1.19+ behaviour, send salted nonce signature
+    ProtocolCraft::SaltSignature salt_signature;
+    salt_signature.SetSalt(salt);
+    salt_signature.SetSignature(salted_nonce_signature);
+    response_msg->SetSaltSignature(salt_signature);
+#endif
 
     // Send additional packet only to server on behalf of the client
     SendDataTo(PacketToBytes(*response_msg), Endpoint::Server);
