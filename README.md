@@ -10,7 +10,8 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Supported minecraft versions: all official releases from 1.12.2 to 1.19.2
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
-- Online mode is supported, with both Mojang and Microsoft accounts
+- Offline ("cracked") mode and online mode (with Microsoft account) are supported
+- Secure chat is supported
 - Logging raw packets at byte level
 - Configuration (which packet to log/ignore) can be changed without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
@@ -47,9 +48,10 @@ Here is an example of a captured session:
 
 Encryption is supported by moving the authentication step from the client to Sniffcraft. This means that all the traffic from the client to Sniffcraft is not encrypted, but the traffic between Sniffcraft and the server is.
 
-To connect to a server in online mode, you need a valid Minecraft account (either Mojang or Microsoft). You **can** use the same account for your client and for Sniffcraft, as the client is considered offline.
+There are two options in the conf file regarding authentication. ``Online`` must be true to connect to a server with authentication activated. SniffCraft will prompt you instructions on the console to log in with a Microsoft account (only the first time, will use cached credentials for the next ones, you can cache multiple Microsoft accounts using different ``MicrosoftAccountCacheKey``).
 
-There are three options in the conf file regarding authentication. ``Online`` must be true to connect to a server with authentication activated. If ``MojangLogin`` and ``MojangPassword`` are set, SniffCraft will try to authenticate with these, otherwise, it will prompt you instructions on the console to log in with a Microsoft account (only the first time, will use cached credentials for the next ones, you can cache multiple Microsoft accounts using different random ``MojangLogin``).
+You **can** use the same account for your client and for Sniffcraft, as the client is considered offline. For 1.19+ versions, if the server has the option secure-profile set to true you **must** use the same account to connect both your client and sniffcraft. Otherwise you'll be kicked out for signature mismatch as soon as you try to send a chat message. If you want to be sure Sniffcraft is using the latest certificates for your account, you can set botcraft_cached_credentials\["MicrosoftAccountCacheKey"\]\["certificates"\]\["expires_date"\] to 0 and Sniffcraft will then get the latest one from Mojang server.
+
 
 ## Dependencies
 
