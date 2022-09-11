@@ -91,7 +91,7 @@ server_address should match the address of the server you want to connect to, wi
 
 If ``LogToReplay`` is present and set to true in the configuration file when the session starts, all packets will also be logged in a format compatible with [replay mod](https://github.com/ReplayMod/ReplayMod). When the capture stops, you'll get a ``XXXX.mcpr`` file that can be opened by the replay mod viewer inside minecraft.
 
-Please note that the current player will **not** appear on this capture, as the replay mod artifically adds some packets to display it.
+Please note that the current player will **not** appear on this capture, as the replay mod artificially adds some packets to display it.
 
 ## License
 
