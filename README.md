@@ -1,3 +1,4 @@
+[![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/wECVsTbjA9)
 
 # SniffCraft
 
@@ -76,6 +77,8 @@ make all
 ```
 
 If you are on Windows, you can replace the last four steps by launching cmake GUI and then compiling the generated .sln from Visual Studio.
+
+If you need more help, you can join the Sniffcraft/Botcraft community [discord server](https://discord.gg/wECVsTbjA9).
 
 Once built, you can start SniffCraft with the following command line:
 
