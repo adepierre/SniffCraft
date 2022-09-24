@@ -20,26 +20,28 @@ jobs:
         - {
             name: "Windows",
             os: windows-latest,
-            generator: "Visual Studio 17 2022"
+            generator: "Visual Studio 17 2022",
+            target: "ALL_BUILD"
           }
         - {
             name: "Linux",
             os: ubuntu-latest,
-            generator: "Unix Makefiles"
+            generator: "Unix Makefiles",
+            target: "all"
           }
 
     steps:
       - uses: actions/checkout@v3
       
       - name: Create Build Folder
-        run: cmake -E make_directory ${{runner.workspace}}/build
+        run: cmake -E make_directory ${{ runner.workspace }}/build
 
       - name: Configure cmake
         shell: bash
-        working-directory: ${{runner.workspace}}/build
+        working-directory: ${{ runner.workspace }}/build
         run: cmake -G "${{ matrix.config.generator }}" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON -S $GITHUB_WORKSPACE -B .
 
       - name: Build
         shell: bash
-        working-directory: ${{runner.workspace}}/build
-        run: cmake --build . --config $BUILD_TYPE --parallel 4 --target all
+        working-directory: ${{ runner.workspace }}/build
+        run: cmake --build . --config $BUILD_TYPE --parallel 2 --target ${{ matrix.config.target }}
