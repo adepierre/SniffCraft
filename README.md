@@ -67,7 +67,7 @@ You don't have to install any dependency to build SniffCraft, everything that is
 
 ## Build and launch
 
-To build for the latest game version, with encryption support:
+Precompiled binaries for the latest game version with encryption support can be found in the [latest release](https://github.com/adepierre/SniffCraft/releases/tag/latest). If you want to build it yourself:
 ```
 git clone https://github.com/adepierre/SniffCraft.git
 cd SniffCraft
