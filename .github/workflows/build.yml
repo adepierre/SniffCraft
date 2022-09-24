@@ -75,7 +75,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ github.workspace }}/bin/sniffcraft.exe
-          asset_name: sniffcraft-windows
+          asset_name: sniffcraft-windows.exe
           tag: latest
           overwrite: true
           prerelease: true
