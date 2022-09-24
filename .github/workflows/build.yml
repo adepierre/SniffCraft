@@ -1,0 +1,45 @@
+name: CMake Build Matrix
+
+on: 
+  push:
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    stragegy:
+      matrix:
+        config:
+        - {
+            name: "Windows",
+            os: windows-latest,
+            generator: "Visual Studio 17 2022"
+          }
+        - {
+            name: "Linux",
+            os: ubuntu-latest,
+            generator: "Unix Makefiles"
+          }
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create Build Folder
+        run: cmake -E make_directory $GITHUB_WORKSPACE/build
+
+      - name: Configure cmake
+        shell: bash
+        working-directory: $GITHUB_WORKSPACE/build
+        run: cmake -G ${{ matrix.config.generator }} -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON ..
+
+      - name: Build
+        shell: bash
+        working-directory: $GITHUB_WORKSPACE/build
+        run: cmake --build . --config $BUILD_TYPE --parallel 4 --target all
