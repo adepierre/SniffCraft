@@ -51,7 +51,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: $GITHUB_WORKSPACE/bin/sniffcraft
+          file: ${{ github.workspace }}/bin/sniffcraft
           asset_name: sniffcraft-linux
           tag: latest
           overwrite: true
@@ -62,7 +62,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: $GITHUB_WORKSPACE/bin/sniffcraft.exe
+          file: ${{ github.workspace }}/bin/sniffcraft.exe
           asset_name: sniffcraft-windows
           tag: latest
           overwrite: true
