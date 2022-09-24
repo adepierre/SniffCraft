@@ -57,7 +57,7 @@ jobs:
           asset_name: sniffcraft-linux
           tag: latest
           overwrite: true
-          prerelease: true
+          prerelease: false
 
       - name: Upload binary to Release (Windows)
         if: ${{ matrix.config.os == 'windows-latest' }}
@@ -68,7 +68,7 @@ jobs:
           asset_name: sniffcraft-windows.exe
           tag: latest
           overwrite: true
-          prerelease: true
+          prerelease: false
 
   update_latest:
     runs-on: ubuntu-latest
