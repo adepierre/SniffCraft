@@ -13,16 +13,6 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  update_latest:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Update Latest Tag
-        uses: richardsimko/update-tag@v1
-        with:
-          tag_name: latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
   build:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
@@ -79,3 +69,14 @@ jobs:
           tag: latest
           overwrite: true
           prerelease: true
+
+  update_latest:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Update Latest Tag
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
