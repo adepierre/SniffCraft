@@ -37,7 +37,7 @@ jobs:
       - name: Configure cmake
         shell: bash
         working-directory: ${{runner.workspace}}/build
-        run: cmake -G "${{ matrix.config.generator }}" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON ..
+        run: cmake -G "${{ matrix.config.generator }}" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON -S .. -B .
 
       - name: Build
         shell: bash
