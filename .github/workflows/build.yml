@@ -2,8 +2,6 @@ name: Build
 
 on: 
   push:
-    tags-ignore:
-      - latest
     paths-ignore:
       - 'README.md'
       - '.gitignore'
