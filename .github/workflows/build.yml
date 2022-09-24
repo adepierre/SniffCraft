@@ -2,6 +2,8 @@ name: Build
 
 on: 
   push:
+    tags-ignore:
+      - latest
     paths-ignore:
       - 'README.md'
       - '.gitignore'
@@ -32,7 +34,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Create Build Folder
         run: cmake -E make_directory ${{ runner.workspace }}/build
 
@@ -45,3 +47,25 @@ jobs:
         shell: bash
         working-directory: ${{ runner.workspace }}/build
         run: cmake --build . --config $BUILD_TYPE --parallel 2 --target ${{ matrix.config.target }}
+
+      - name: Upload binary to Release (Ubuntu)
+        if: ${{ matrix.config.os == 'ubuntu-latest' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: $GITHUB_WORKSPACE/bin/sniffcraft
+          asset_name: sniffcraft-linux
+          tag: latest
+          overwrite: true
+          prerelease: true
+
+      - name: Upload binary to Release (Windows)
+        if: ${{ matrix.config.os == 'windows-latest' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: $GITHUB_WORKSPACE/bin/sniffcraft.exe
+          asset_name: sniffcraft-windows
+          tag: latest
+          overwrite: true
+          prerelease: true
