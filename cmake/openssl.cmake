@@ -25,12 +25,12 @@ if (NOT OPENSSL_FOUND AND RES_LEN EQUAL 0)
         COMMAND "cmake" "${OPENSSL_SRC_PATH}" "-G" "${CMAKE_GENERATOR}" "-A" "${CMAKE_GENERATOR_PLATFORM}" "-DCMAKE_BUILD_TYPE=Release" "-DCMAKE_INSTALL_PREFIX=install" "-DWITH_APPS=OFF" "-DCPACK_SOURCE_7Z=OFF" "-DCPACK_SOURCE_ZIP=OFF" "-DMSVC_RUNTIME=dynamic" "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
         WORKING_DIRECTORY "${OPENSSL_BUILD_PATH}")
 
-    execute_process(COMMAND "cmake" "--build" "." "--target" "install" "--config" "Release" WORKING_DIRECTORY "${OPENSSL_BUILD_PATH}")
+    execute_process(COMMAND "cmake" "--build" "." "--target" "install" "--config" "Release" "--parallel" "2" WORKING_DIRECTORY "${OPENSSL_BUILD_PATH}")
 
     set(OPENSSL_FOUND ON CACHE INTERNAL "")
 endif()
 
-if(NOT TARGET OpenSSL::SSL OR NOT TARGET OpenSSL::Crypto)    
+if(NOT TARGET OpenSSL::SSL OR NOT TARGET OpenSSL::Crypto)
     # Create imported targets
     file(GLOB ssl_lib_file "${OPENSSL_BUILD_PATH}/install/lib/*libssl*")
     add_library(OpenSSL::SSL STATIC IMPORTED)
@@ -41,4 +41,5 @@ if(NOT TARGET OpenSSL::SSL OR NOT TARGET OpenSSL::Crypto)
     add_library(OpenSSL::Crypto STATIC IMPORTED)
     set_property(TARGET OpenSSL::Crypto PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_BUILD_PATH}/install/include")
     set_target_properties(OpenSSL::Crypto PROPERTIES IMPORTED_LOCATION "${crypto_lib_file}")
+    set_target_properties(OpenSSL::Crypto PROPERTIES INTERFACE_LINK_LIBRARIES ${CMAKE_DL_LIBS})
 endif()
