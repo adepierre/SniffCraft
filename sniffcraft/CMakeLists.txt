@@ -104,11 +104,11 @@ target_compile_definitions(sniffcraft PUBLIC ASIO_STANDALONE)
 target_link_libraries(sniffcraft PUBLIC ZLIB::ZLIB)
 
 # Add OpenSSL
-if(WITH_ENCRYPTION)
+if(SNIFFCRAFT_WITH_ENCRYPTION)
     target_link_libraries(sniffcraft PUBLIC OpenSSL::SSL)
     target_link_libraries(sniffcraft PUBLIC OpenSSL::Crypto)
     target_compile_definitions(sniffcraft PUBLIC USE_ENCRYPTION=1)
-endif(WITH_ENCRYPTION)
+endif(SNIFFCRAFT_WITH_ENCRYPTION)
 
 # Add threads support
 target_link_libraries(sniffcraft PUBLIC Threads::Threads)

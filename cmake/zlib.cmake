@@ -1,7 +1,9 @@
 #Add zlib library
 
 # We first try to find zlib in the system
-find_package(ZLIB QUIET)
+if (NOT SNIFFCRAFT_FORCE_LOCAL_ZLIB)
+    find_package(ZLIB QUIET)
+endif(NOT SNIFFCRAFT_FORCE_LOCAL_ZLIB)
 
 # If not found, build from sources
 if(NOT TARGET ZLIB::ZLIB)
@@ -9,19 +11,18 @@ if(NOT TARGET ZLIB::ZLIB)
 
     file(GLOB RESULT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/zlib/examples")
     list(LENGTH RESULT RES_LEN)
-    message(STATUS ${RES_LEN})
     if(RES_LEN EQUAL 0)
         message(STATUS "Zlib not found, cloning it...")
         execute_process(COMMAND git submodule update --init -- 3rdparty/zlib WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
-    
+
     set(ZLIB_SRC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/zlib")
     set(ZLIB_BUILD_PATH "${CMAKE_CURRENT_BINARY_DIR}/3rdparty/zlib")
 
     file(MAKE_DIRECTORY "${ZLIB_BUILD_PATH}")
 
     execute_process(
-        COMMAND "cmake" "${ZLIB_SRC_PATH}" "-G" "${CMAKE_GENERATOR}" "-CMAKE_BUILD_TYPE=Release" "-A" "${CMAKE_GENERATOR_PLATFORM}" "-DCMAKE_INSTALL_PREFIX=install" 
+        COMMAND "cmake" "${ZLIB_SRC_PATH}" "-G" "${CMAKE_GENERATOR}" "-DCMAKE_BUILD_TYPE=Release" "-A" "${CMAKE_GENERATOR_PLATFORM}" "-DCMAKE_INSTALL_PREFIX=install"
         WORKING_DIRECTORY "${ZLIB_BUILD_PATH}")
 
     execute_process(COMMAND "cmake" "--build" "." "--target" "install" "--config" "Release" WORKING_DIRECTORY "${ZLIB_BUILD_PATH}")

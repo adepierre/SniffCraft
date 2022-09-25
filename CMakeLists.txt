@@ -4,7 +4,9 @@ project(SniffCraft)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-option(WITH_ENCRYPTION "Activate for online mode support" ON)
+option(SNIFFCRAFT_WITH_ENCRYPTION "Activate for online mode support" ON)
+option(SNIFFCRAFT_FORCE_LOCAL_ZLIB "Force using a local install of zlib even if already present on the system" OFF)
+option(SNIFFCRAFT_FORCE_LOCAL_OPENSSL "Force using a local install of openSSL even if already present on the system" OFF)
 
 # Add Asio
 include("${CMAKE_SOURCE_DIR}/cmake/asio.cmake")
@@ -16,9 +18,9 @@ include("${CMAKE_SOURCE_DIR}/cmake/json.cmake")
 include("${CMAKE_SOURCE_DIR}/cmake/zlib.cmake")
 
 # Add OpenSSL
-if(WITH_ENCRYPTION)
+if(SNIFFCRAFT_WITH_ENCRYPTION)
     include("${CMAKE_SOURCE_DIR}/cmake/openssl.cmake")
-endif(WITH_ENCRYPTION)
+endif(SNIFFCRAFT_WITH_ENCRYPTION)
 
 # Add ProtocolCraft
 include("${CMAKE_SOURCE_DIR}/cmake/botcraft.cmake")

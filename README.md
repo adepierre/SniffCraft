@@ -62,7 +62,7 @@ You don't have to install any dependency to build SniffCraft, everything that is
 - [asio](https://think-async.com/Asio/)
 - [nlohmann json](https://github.com/nlohmann/json)
 - [zlib](https://github.com/madler/zlib)
-- [openssl](https://www.openssl.org/) (optional, only if cmake option WITH_ENCRYPTION is set)
+- [openssl](https://www.openssl.org/) (optional, only if cmake option SNIFFCRAFT_WITH_ENCRYPTION is set)
 - [botcraft](https://github.com/adepierre/botcraft)
 
 ## Build and launch
@@ -73,7 +73,7 @@ git clone https://github.com/adepierre/SniffCraft.git
 cd SniffCraft
 mkdir build
 cd build
-cmake -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON ..
+cmake -DGAME_VERSION=latest -DSNIFFCRAFT_WITH_ENCRYPTION=ON ..
 make all
 ```
 

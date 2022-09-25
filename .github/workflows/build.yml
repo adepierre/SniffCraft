@@ -41,7 +41,7 @@ jobs:
       - name: Configure cmake
         shell: bash
         working-directory: ${{ runner.workspace }}/build
-        run: cmake -G "${{ matrix.config.generator }}" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DWITH_ENCRYPTION=ON -S $GITHUB_WORKSPACE -B .
+        run: cmake -G "${{ matrix.config.generator }}" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DSNIFFCRAFT_WITH_ENCRYPTION=ON -DSNIFFCRAFT_FORCE_LOCAL_ZLIB=ON -DSNIFFCRAFT_FORCE_LOCAL_OPENSSL=ON -S $GITHUB_WORKSPACE -B .
 
       - name: Build
         shell: bash
