@@ -41,6 +41,8 @@ endif()
 list(FIND GameVersionValues ${GAME_VERSION} game_version_index)
 list(GET ProtocolVersionValues ${game_version_index} PROTOCOL_VERSION)
 message(STATUS "Selected game version: " ${GAME_VERSION} " || Protocol: " ${PROTOCOL_VERSION})
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.txt" ${GAME_VERSION})
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/protocol.txt" ${PROTOCOL_VERSION})
 
 
 add_subdirectory(3rdparty/botcraft/protocolCraft)
