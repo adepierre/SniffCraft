@@ -525,7 +525,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
     response_msg->SetKeyBytes(encrypted_shared_secret);
 #if PROTOCOL_VERSION < 759
     // Pre-1.19 behaviour, send encrypted nonce
-    response_msg->SetNonce(encrypted_token);
+    response_msg->SetNonce(encrypted_nonce);
 #else
     // 1.19+ behaviour, send salted nonce signature
     ProtocolCraft::SaltSignature salt_signature;
