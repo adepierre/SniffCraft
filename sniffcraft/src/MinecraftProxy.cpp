@@ -30,6 +30,7 @@ MinecraftProxy::MinecraftProxy(asio::io_context& io_context, const std::string& 
     compression_threshold = -1;
 
     LoadConfig(conf_path);
+    std::cout << "Ready to accept new connections..." << std::endl;
 }
 
 asio::ip::tcp::socket& MinecraftProxy::ClientSocket()

@@ -151,7 +151,7 @@ void Logger::LoadConfig(const std::string& path)
     }
 
     last_time_log_file_modified = modification_time;
-    std::cout << "Loading updated conf file" << std::endl;
+    std::cout << "Loading updated conf file..." << std::endl;
 
     std::stringstream ss;
     std::ifstream file;
@@ -229,6 +229,7 @@ void Logger::LoadConfig(const std::string& path)
             LoadPacketsFromJson(null_value, it->second);
         }
     }
+    std::cout << "Conf file loaded!" << std::endl;
 }
 
 void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraft::ConnectionState connection_state)
