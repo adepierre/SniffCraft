@@ -13,7 +13,7 @@
 #include "sniffcraft/Logger.hpp"
 #include "sniffcraft/ReplayModLogger.hpp"
 
-#define MAX_LENGTH 1024
+constexpr size_t MAX_LENGTH = 1024;
 
 #ifdef USE_ENCRYPTION
 namespace Botcraft
@@ -95,4 +95,3 @@ private:
     std::unique_ptr<Botcraft::AESEncrypter> encrypter;
 #endif
 };
-

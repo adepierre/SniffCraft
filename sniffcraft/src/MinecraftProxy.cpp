@@ -461,6 +461,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
 #else
         replacement_hello_packet.SetName(authentifier->GetPlayerDisplayName());
 
+#if PROTOCOL_VERSION < 761
         ProtocolCraft::ProfilePublicKey key;
         key.SetTimestamp(authentifier->GetKeyTimestamp());
         const std::vector<unsigned char> key_bytes = Botcraft::RSAToBytes(authentifier->GetPublicKey());
@@ -472,6 +473,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
         key.SetKey(key_bytes);
         key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
         replacement_hello_packet.SetPublicKey(key);
+#endif
 #if PROTOCOL_VERSION > 759
         replacement_hello_packet.SetProfileId(authentifier->GetPlayerUUID());
 #endif
@@ -498,8 +500,10 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 #ifdef USE_ENCRYPTION
     if (!authentifier)
     {
-        std::cerr << "WARNING, trying to connect to a server with encryption enabled\n" <<
-            "but impossible without being authenticated." << std::endl;
+        std::cerr << "WARNING, trying to connect to a server with encryption enabled\n"
+            << "but impossible without being authenticated.\n"
+            << "Try changing Online to true in sniffcraft conf json file"
+            << std::endl;
         throw std::runtime_error("Not authenticated");
     }
 
@@ -512,12 +516,16 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
     std::vector<unsigned char> encrypted_nonce;
     encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(),
         raw_shared_secret, encrypted_nonce, encrypted_shared_secret);
-#else
+#elif PROTOCOL_VERSION < 761
     std::vector<unsigned char> salted_nonce_signature;
     long long int salt;
     encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(), authentifier->GetPrivateKey(),
         raw_shared_secret, encrypted_shared_secret,
         salt, salted_nonce_signature);
+#else
+    std::vector<unsigned char> encrypted_challenge;
+    encrypter_->Init(msg.GetPublicKey(), msg.GetChallenge(),
+        raw_shared_secret, encrypted_shared_secret, encrypted_challenge);
 #endif
 
     authentifier->JoinServer(msg.GetServerID(), raw_shared_secret, msg.GetPublicKey());
@@ -527,12 +535,15 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 #if PROTOCOL_VERSION < 759
     // Pre-1.19 behaviour, send encrypted nonce
     response_msg->SetNonce(encrypted_nonce);
-#else
-    // 1.19+ behaviour, send salted nonce signature
+#elif PROTOCOL_VERSION < 761
+    // 1.19 - 1.19.2 behaviour, send salted nonce signature
     ProtocolCraft::SaltSignature salt_signature;
     salt_signature.SetSalt(salt);
     salt_signature.SetSignature(salted_nonce_signature);
     response_msg->SetSaltSignature(salt_signature);
+#else
+    // 1.19.3+ behaviour, back to sending encrypted challenge only
+    response_msg->SetEncryptedChallenge(encrypted_challenge);
 #endif
 
     // Send additional packet only to server on behalf of the client
@@ -549,7 +560,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
     server_replacement_data = { 0x00 };
 #else
     std::cerr << "WARNING, trying to connect to a server with encryption enabled\n" <<
-        "but sniffcraft was build without encryption support." << std::endl;
+        "but sniffcraft was built without encryption support." << std::endl;
     throw std::runtime_error("Not authenticated");
 #endif
 }

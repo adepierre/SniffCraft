@@ -9,7 +9,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.19.2
+- Supported minecraft versions: all official releases from 1.12.2 to 1.19.3
 - Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
 - Compression is supported
 - Offline ("cracked") mode and online mode (with Microsoft account) are supported
@@ -52,7 +52,14 @@ Encryption is supported by moving the authentication step from the client to Sni
 
 There are two options in the conf file regarding authentication. ``Online`` must be true to connect to a server with authentication activated. SniffCraft will prompt you instructions on the console to log in with a Microsoft account (only the first time, will use cached credentials for the next ones, you can cache multiple Microsoft accounts using different ``MicrosoftAccountCacheKey``).
 
-You **can** use the same account for your client and for Sniffcraft, as the client is considered offline. For 1.19+ versions, if the server has the option secure-profile set to true you **must** use the same account to connect both your client and sniffcraft. Otherwise you'll be kicked out for signature mismatch as soon as you try to send a chat message. If you want to be sure Sniffcraft is using the latest certificates for your account, you can set botcraft_cached_credentials\["MicrosoftAccountCacheKey"\]\["certificates"\]\["expires_date"\] to 0 and Sniffcraft will then get the latest one from Mojang server.
+Depending on the version you are using, there are additional restrictions regarding authentication:
+- for versions up to 1.18.2, you can use any client you want ("cracked" or regular with any account) as long as you are authenticated with a valid account in sniffcraft.
+- for versions 1.19 to 1.19.2, there are two subcases:
+    - if the server has the option `enforce-secure-profile` set to false, then it's the same as for < 1.19 versions, you can use any client you want.
+    - if the server has the option `enforce-secure-profile` set to true, then you **must** use a client authenticated with the **same** account you are using in sniffcraft. Otherwise you will be kicked out for signing key mismatch as soon as you try to send a chat message.
+- for version 1.19.3, you can once again use any client you want ("cracked" or regular with any account). However, the server will refuse chat messages (without kicking you out though) if `enforce-secure-profile` is set to true as they won't be signed. Chat will probably be supported for this version when I figure out a way to do it properly.
+
+If you want to be sure Sniffcraft is using the latest certificates for your account (for 1.19+ versions), you can set botcraft_cached_credentials\["TheMicrosoftAccountCacheKeyYouSet"\]\["certificates"\]\["expires_date"\] to 0 and Sniffcraft will then retreive the latest ones from Mojang server.
 
 
 ## Dependencies
@@ -74,10 +81,8 @@ cd SniffCraft
 mkdir build
 cd build
 cmake -DGAME_VERSION=latest -DSNIFFCRAFT_WITH_ENCRYPTION=ON ..
-make all
+cmake --build . --config Release
 ```
-
-If you are on Windows, you can replace the last four steps by launching cmake GUI and then compiling the generated .sln from Visual Studio.
 
 If you need more help, you can join the Sniffcraft/Botcraft community [discord server](https://discord.gg/wECVsTbjA9).
 
