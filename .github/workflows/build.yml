@@ -96,7 +96,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           body: |
-            Automatically generated binaries with the latest version of the code for Minecraft ${{ needs.build.outputs.Windows }}.
+            Automatically generated binaries with the latest version of the code for Minecraft ${{ steps.mc-version.outputs.content }}.
             
             Examples of conf files can be found [here](https://github.com/adepierre/SniffCraft/tree/master/conf).
           draft: false
