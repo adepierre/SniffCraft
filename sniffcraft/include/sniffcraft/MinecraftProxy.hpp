@@ -1,56 +1,44 @@
 #pragma once
 
-#include <deque>
-#include <vector>
-#include <mutex>
-#include <memory>
-
-#include <asio.hpp>
-
 #include <protocolCraft/Handler.hpp>
 
-#include "sniffcraft/enums.hpp"
-#include "sniffcraft/Logger.hpp"
-#include "sniffcraft/ReplayModLogger.hpp"
-
-constexpr size_t MAX_LENGTH = 1024;
+#include "sniffcraft/BaseProxy.hpp"
 
 #ifdef USE_ENCRYPTION
 namespace Botcraft
 {
     class Authentifier;
-    class AESEncrypter;
 }
 #endif
 
-class MinecraftProxy : public ProtocolCraft::Handler
+class Logger;
+class ReplayModLogger;
+
+class MinecraftProxy : public BaseProxy, public ProtocolCraft::Handler
 {
 public:
-    MinecraftProxy(asio::io_context& io_context, const std::string &conf_path);
-    void Start(const std::string& server_address, const unsigned short server_port);
-    void Close();
-    asio::ip::tcp::socket& ClientSocket();
-    asio::ip::tcp::socket& ServerSocket();
+    MinecraftProxy(asio::io_context& io_context, const std::string& conf_path);
+    virtual ~MinecraftProxy();
+    
+    virtual void Start(const std::string& server_address, const unsigned short server_port) override;
+
+protected:
+    virtual size_t ProcessData(const std::vector<unsigned char>::const_iterator& data, const size_t length, const Endpoint source) override;
 
 private:
-    void handle_server_connect(const asio::error_code &ec);
+    /// @brief Check the size of the next MC packet
+    /// @param data iterator to the data start
+    /// @param length number of available bytes
+    /// @return The size of the next packet, or 0 if not enough bytes to read the size
+    size_t Peek(std::vector<unsigned char>::const_iterator& data, size_t& length);
 
-    void handle_server_read(const asio::error_code& ec, const size_t& bytes_transferred);
-    void handle_client_write(const asio::error_code& ec);
+    /// @brief Convert a MC packet to bytes vector
+    /// @param msg Packet to convert
+    /// @return Bytes representation of the packet
+    std::vector<unsigned char> PacketToBytes(const ProtocolCraft::Message& msg) const;
 
-    void handle_client_read(const asio::error_code& ec, const size_t& bytes_transferred);
-    void handle_server_write(const asio::error_code& ec);
+    void LoadConfig();
 
-    void ExtractPacketFromIncomingData(const Endpoint from, const size_t& bytes_transferred);
-    void ParsePacket(const Endpoint from, std::vector<unsigned char>::const_iterator& read_iter, size_t& max_length);
-
-    const std::vector<unsigned char> PacketToBytes(const ProtocolCraft::Message& msg);
-
-    void SendDataTo(const std::vector<unsigned char>& data, const Endpoint to);
-
-    void LoadConfig(const std::string& conf_path);
-
-private:
     virtual void Handle(ProtocolCraft::Message& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundHelloPacket& msg) override;
@@ -59,39 +47,15 @@ private:
     virtual void Handle(ProtocolCraft::ClientboundHelloPacket& msg) override;
 
 private:
-    asio::io_context& io_context_;
+    std::string conf_path_;
 
-    asio::ip::tcp::socket client_socket_;
-    std::array<unsigned char, MAX_LENGTH> input_client_buffer_;
-    asio::ip::tcp::socket server_socket_;
-    std::array<unsigned char, MAX_LENGTH> input_server_buffer_;
-    bool client_closed;
-    bool server_closed;
-
-    std::deque<std::vector<unsigned char> > output_client_data_;
-    std::mutex output_client_mutex_;
-    std::vector<unsigned char> output_client_buffer_;
-    std::deque<std::vector<unsigned char> > output_server_data_;
-    std::mutex output_server_mutex_;
-    std::vector<unsigned char> output_server_buffer_;
-
-    std::vector<unsigned char> input_client_data_;
-    std::vector<unsigned char> input_server_data;
+    std::unique_ptr<Logger> logger;
+    std::unique_ptr<ReplayModLogger> replay_logger;
 
     ProtocolCraft::ConnectionState connection_state;
-
-    std::vector<unsigned char> client_replacement_data;
-    std::vector<unsigned char> server_replacement_data;
-
+    bool transmit_original_packet;
     int compression_threshold;
-
-    Logger logger;
-    ReplayModLogger replay_logger;
-    std::string server_ip_;
-    unsigned short server_port_;
-
 #ifdef USE_ENCRYPTION
     std::unique_ptr<Botcraft::Authentifier> authentifier;
-    std::unique_ptr<Botcraft::AESEncrypter> encrypter;
 #endif
 };

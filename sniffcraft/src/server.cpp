@@ -24,10 +24,11 @@ const std::vector<std::string> SplitString(const std::string& s, const char deli
 }
 
 Server::Server(asio::io_context& io_context, const unsigned short client_port,
-    const std::string& server_address, const std::string &conf_path_) : 
+    const std::string& server_address, const std::string& conf_path_) :
     io_context_(io_context),
     acceptor_(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), client_port)),
-    conf_path(conf_path_)
+    conf_path(conf_path_),
+    client_port_(client_port)
 {
     ResolveIpPortFromAddress(server_address);
     start_accept();
@@ -35,13 +36,16 @@ Server::Server(asio::io_context& io_context, const unsigned short client_port,
 
 void Server::start_accept()
 {
-    MinecraftProxy* new_proxy = new MinecraftProxy(io_context_, conf_path);
-    acceptor_.async_accept(new_proxy->ClientSocket(),
-        std::bind(&Server::handle_accept, this, new_proxy,
+    BaseProxy* proxy = GetNewProxy();
+
+    acceptor_.async_accept(proxy->ClientSocket(),
+        std::bind(&Server::handle_accept, this, proxy,
             std::placeholders::_1));
+
+    std::cout << "Waiting connection on 127.0.0.1:" << client_port_ << std::endl;
 }
 
-void Server::handle_accept(MinecraftProxy* new_proxy, const asio::error_code& ec)
+void Server::handle_accept(BaseProxy* new_proxy, const asio::error_code& ec)
 {
     if (!ec)
     {
@@ -49,7 +53,7 @@ void Server::handle_accept(MinecraftProxy* new_proxy, const asio::error_code& ec
     }
     else
     {
-        delete new_proxy;
+        std::cerr << "Failed to start new proxy" << std::endl;
     }
     start_accept();
 }
@@ -153,3 +157,20 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
     server_ip_ = addressOnly;
 }
 
+BaseProxy* Server::GetNewProxy()
+{
+    // Clean old proxies
+    for (int i = proxies.size() - 1; i > -1; --i)
+    {
+        if (!proxies[i]->Running())
+        {
+            proxies.erase(proxies.begin() + i);
+        }
+    }
+
+    // If we are here, it means there is no available proxy, create a new one
+    std::unique_ptr<BaseProxy> proxy = std::make_unique<MinecraftProxy>(io_context_, conf_path);
+    proxies.push_back(std::move(proxy));
+
+    return proxies.back().get();
+}

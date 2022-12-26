@@ -1,11 +1,15 @@
 project(sniffcraft)
 
-set(sniffcraft_PUBLIC_HDR 
+set(sniffcraft_PUBLIC_HDR
+    include/sniffcraft/BaseProxy.hpp
     include/sniffcraft/Compression.hpp
+    include/sniffcraft/Connection.hpp
+    include/sniffcraft/DataProcessor.hpp
     include/sniffcraft/enums.hpp
     include/sniffcraft/FileUtilities.hpp
     include/sniffcraft/Logger.hpp
     include/sniffcraft/LogItem.hpp
+    include/sniffcraft/MinecraftEncryptionDataProcessor.hpp
     include/sniffcraft/MinecraftProxy.hpp
     include/sniffcraft/ReplayModLogger.hpp
     include/sniffcraft/server.hpp
@@ -27,9 +31,12 @@ set(sniffcraft_PUBLIC_HDR
 )
 
 set(sniffcraft_SRC
+    src/BaseProxy.cpp
     src/Compression.cpp
+    src/Connection.cpp
     src/FileUtilities.cpp
     src/Logger.cpp
+    src/MinecraftEncryptionDataProcessor.cpp
     src/MinecraftProxy.cpp
     src/ReplayModLogger.cpp
     src/server.cpp

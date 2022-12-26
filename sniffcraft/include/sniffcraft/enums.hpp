@@ -5,5 +5,7 @@ enum class Endpoint
     Server,
     Client,
     SniffcraftToServer,
-    SniffcraftToClient
+    SniffcraftToClient,
+    ServerToSniffcraft,
+    ClientToSniffcraft
 };

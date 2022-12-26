@@ -1,326 +1,160 @@
-#include "sniffcraft/MinecraftProxy.hpp"
-#include "sniffcraft/Compression.hpp"
+#include <iostream>
+
+#include <nlohmann/json.hpp>
 
 #include <protocolCraft/BinaryReadWrite.hpp>
 #include <protocolCraft/MessageFactory.hpp>
 
+#ifdef USE_ENCRYPTION
 #include <botcraft/Network/AESEncrypter.hpp>
 #include <botcraft/Network/Authentifier.hpp>
-#if PROTOCOL_VERSION > 758
-#include <botcraft/Utilities/StringUtilities.hpp>
 #endif
 
-#include <nlohmann/json.hpp>
+#include "sniffcraft/Compression.hpp"
+#include "sniffcraft/MinecraftProxy.hpp"
+#include "sniffcraft/Logger.hpp"
+#include "sniffcraft/ReplayModLogger.hpp"
+#ifdef USE_ENCRYPTION
+#include "sniffcraft/MinecraftEncryptionDataProcessor.hpp"
+#endif
 
-#include <functional>
-#include <iostream>
-#include <memory>
+
 
 MinecraftProxy::MinecraftProxy(asio::io_context& io_context, const std::string& conf_path) :
-    io_context_(io_context),
-    client_socket_(io_context),
-    server_socket_(io_context),
-    logger(conf_path),
-    replay_logger(conf_path)
+    BaseProxy(io_context)
 {
     connection_state = ProtocolCraft::ConnectionState::Handshake;
-    client_closed = false;
-    server_closed = false;
-
     compression_threshold = -1;
-
-    LoadConfig(conf_path);
-    std::cout << "Ready to accept new connections..." << std::endl;
+    conf_path_ = conf_path;
 }
 
-asio::ip::tcp::socket& MinecraftProxy::ClientSocket()
+MinecraftProxy::~MinecraftProxy()
 {
-    return client_socket_;
-}
 
-asio::ip::tcp::socket& MinecraftProxy::ServerSocket()
-{
-    return server_socket_;
 }
 
 void MinecraftProxy::Start(const std::string& server_address, const unsigned short server_port)
 {
-    std::cout << "Starting new proxy to " << server_address << ":" << server_port << std::endl;
-    server_ip_ = server_address;
-    server_port_ = server_port;
+    logger = std::make_unique<Logger>(conf_path_);
+    replay_logger = nullptr;
 
-    replay_logger.SetServerName(server_ip_ + ":" + std::to_string(server_port_));
+    LoadConfig();
 
-    // Try to connect to remote server
-    asio::ip::tcp::resolver resolver(io_context_);
-    asio::ip::tcp::resolver::query query(server_ip_, std::to_string(server_port_));
-    asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
-
-    asio::async_connect(server_socket_, iterator,
-        std::bind(&MinecraftProxy::handle_server_connect, this, std::placeholders::_1));
+    BaseProxy::Start(server_address, server_port);
 }
 
-void MinecraftProxy::handle_server_connect(const asio::error_code& ec)
+size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_iterator& data, const size_t length, const Endpoint source)
 {
-    if (!ec)
-    {
-        // Read from server
-        server_socket_.async_read_some(asio::buffer(input_server_buffer_.data(), MAX_LENGTH),
-            std::bind(&MinecraftProxy::handle_server_read, this,
-                std::placeholders::_1, std::placeholders::_2));
+    Connection& dst_connection = source == Endpoint::Server ? client_connection : server_connection;
 
-        // Read from client
-        client_socket_.async_read_some(asio::buffer(input_client_buffer_.data(), MAX_LENGTH),
-            std::bind(&MinecraftProxy::handle_client_read, this,
-                std::placeholders::_1, std::placeholders::_2));
-    }
-    else
-    {
-        Close();
-    }
-}
+    std::vector<unsigned char>::const_iterator data_iterator = data;
+    size_t max_length = length;
 
-void MinecraftProxy::handle_server_read(const asio::error_code& ec, const size_t& bytes_transferred)
-{
-    if (!ec)
-    {
-        ExtractPacketFromIncomingData(Endpoint::Server, bytes_transferred);
+    const size_t packet_length = Peek(data_iterator, max_length);
+    const size_t packet_length_length = length - max_length;
 
-        server_socket_.async_read_some(asio::buffer(input_server_buffer_.data(), MAX_LENGTH),
-            std::bind(&MinecraftProxy::handle_server_read, this,
-                std::placeholders::_1, std::placeholders::_2));
-    }
-    else
+    // We don't have enough data to get packet size
+    if (packet_length == 0)
     {
-        Close();
+        return 0;
     }
-}
-
-void MinecraftProxy::handle_client_write(const asio::error_code& ec)
-{
-    if (!ec)
+    // We don't have enough data to get a full packet
+    if (packet_length > max_length)
     {
-        output_client_mutex_.lock();
-        output_client_data_.pop_front();
-
-        if (!output_client_data_.empty())
-        {
-            output_client_buffer_ = output_client_data_.front();
-            asio::async_write(client_socket_, asio::buffer(output_client_buffer_.data(), output_client_buffer_.size()),
-                std::bind(&MinecraftProxy::handle_client_write, this,
-                    std::placeholders::_1));
-        }
-        output_client_mutex_.unlock();
-    }
-    else
-    {
-        Close();
-    }
-}
-
-void MinecraftProxy::handle_client_read(const asio::error_code& ec, const size_t& bytes_transferred)
-{
-    if (!ec)
-    {
-        ExtractPacketFromIncomingData(Endpoint::Client, bytes_transferred);
-
-        client_socket_.async_read_some(asio::buffer(input_client_buffer_.data(), MAX_LENGTH),
-            std::bind(&MinecraftProxy::handle_client_read, this,
-                std::placeholders::_1, std::placeholders::_2));
-    }
-    else
-    {
-        Close();
-    }
-}
-
-void MinecraftProxy::handle_server_write(const asio::error_code& ec)
-{
-    if (!ec)
-    {
-        output_server_mutex_.lock();
-        output_server_data_.pop_front();
-
-        if (!output_server_data_.empty())
-        {
-            output_server_buffer_ = output_server_data_.front();
-            asio::async_write(server_socket_, asio::buffer(output_server_buffer_.data(), output_server_buffer_.size()),
-                std::bind(&MinecraftProxy::handle_server_write, this,
-                    std::placeholders::_1));
-        }
-        output_server_mutex_.unlock();
-    }
-    else
-    {
-        Close();
-    }
-}
-
-void MinecraftProxy::Close()
-{
-    if (client_closed && server_closed)
-    {
-        return;
+        return 0;
     }
 
-    if (client_socket_.is_open())
-    {
-        client_socket_.close();
-        client_closed = true;
-    }
-
-    if (server_socket_.is_open())
-    {
-        server_socket_.close();
-        server_closed = true;
-    }
-
-    std::cout << "Session closed" << std::endl;
-    
-    delete this;
-}
-
-void MinecraftProxy::ExtractPacketFromIncomingData(const Endpoint from, const size_t& bytes_transferred)
-{
-    const std::array<unsigned char, MAX_LENGTH>& src_buffer = (from == Endpoint::Server) ? input_server_buffer_ : input_client_buffer_;
-    std::vector<unsigned char>& src_data = (from == Endpoint::Server) ? input_server_data : input_client_data_;
-    std::vector<unsigned char>& replacement_data = (from == Endpoint::Server) ? server_replacement_data : client_replacement_data;
-    Endpoint destination = (from == Endpoint::Server) ? Endpoint::Client : Endpoint::Server;
-
-    // If data are from the server and encryption is enabled,
-    // we first need to decrypt the data
-#ifdef USE_ENCRYPTION
-    if (from == Endpoint::Server && encrypter)
-    {
-        std::vector<unsigned char> decrypted(std::begin(src_buffer), std::begin(src_buffer) + bytes_transferred);
-        decrypted = encrypter->Decrypt(decrypted);
-        src_data.insert(std::end(src_data), std::begin(decrypted), std::end(decrypted));
-    }
-    else
-    {
-        src_data.insert(std::end(src_data), std::begin(src_buffer), std::begin(src_buffer) + bytes_transferred);
-    }
-#else
-    src_data.insert(std::end(src_data), std::begin(src_buffer), std::begin(src_buffer) + bytes_transferred);
-#endif
-
-
-    while (src_data.size() != 0)
-    {
-        std::vector<unsigned char>::const_iterator read_iter = src_data.begin();
-        size_t max_length = src_data.size();
-        int packet_length = 0;
-
-        // We need a try catch in case all the bytes of 
-        // the varint are not in this buffer
-        try
-        {
-            packet_length = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(read_iter, max_length);
-        }
-        catch (const std::exception&)
-        {
-            break;
-        }
-
-        int bytes_read = std::distance<std::vector<unsigned char>::const_iterator>(std::begin(src_data), read_iter);
-        
-        if (packet_length > 0 && src_data.size() >= bytes_read + packet_length)
-        {
-            size_t parse_max_size = packet_length;
-
-            replacement_data.clear();
-            ParsePacket(from, read_iter, parse_max_size);
-
-            std::vector<unsigned char> output_packet;
-            if (replacement_data.size() == 0)
-            {
-                output_packet = std::vector<unsigned char>(std::begin(src_data), std::begin(src_data) + bytes_read + packet_length);
-            }
-            // Packet of size 1 don't exist, so we use this as a signal
-            // the data should NOT be transmitted to the other endpoint
-            else if (replacement_data.size() > 1)
-            {
-                output_packet = replacement_data;
-            }
-
-            SendDataTo(output_packet, destination);
-
-            src_data.erase(std::begin(src_data), std::begin(src_data) + bytes_read + packet_length);
-        }
-        else
-        {
-            break;
-        }
-    }
-}
-
-void MinecraftProxy::ParsePacket(const Endpoint from, std::vector<unsigned char>::const_iterator& read_iter, size_t& max_length)
-{
-    int minecraftID = -1;
+    size_t remaining_packet_bytes = packet_length;
     std::vector<unsigned char> uncompressed;
-
-    if (compression_threshold >= 0)
+    if (compression_threshold > -1)
     {
-        int data_length = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(read_iter, max_length);
-
+        const int data_length = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(data_iterator, remaining_packet_bytes);
         if (data_length != 0)
         {
-            uncompressed = Decompress(std::vector<unsigned char>(read_iter, read_iter + max_length), 0);
-            read_iter = std::begin(uncompressed);
-            max_length = uncompressed.size();
+            uncompressed = Decompress(&(*data_iterator), remaining_packet_bytes);
+            data_iterator = uncompressed.begin();
+            remaining_packet_bytes = uncompressed.size();
         }
     }
 
-    minecraftID = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(read_iter, max_length);
+    const int minecraft_id = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(data_iterator, remaining_packet_bytes);
 
-    std::shared_ptr<ProtocolCraft::Message> msg;
+    std::shared_ptr<ProtocolCraft::Message> msg = source == Endpoint::Client ?
+        ProtocolCraft::MessageFactory::CreateMessageServerbound(minecraft_id, connection_state) :
+        ProtocolCraft::MessageFactory::CreateMessageClientbound(minecraft_id, connection_state);
 
-    if (from == Endpoint::Client)
-    {
-        msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(minecraftID, connection_state);
-    }
-    else if (from == Endpoint::Server)
-    {
-        msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(minecraftID, connection_state);
-    }
-
+    // Clear the replacement bytes vector
+    transmit_original_packet = true;
+    bool error_parsing = false;
     if (msg != nullptr)
     {
-        bool error_parsing = false;
         try
         {
-            msg->Read(read_iter, max_length);
+            msg->Read(data_iterator, remaining_packet_bytes);
         }
-        catch (const std::exception & ex)
+        catch (const std::exception& ex)
         {
-            std::cout << ((from == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
+            std::cout << ((source == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
                 "PARSING EXCEPTION: " << ex.what() << " || " << msg->GetName() << std::endl;
             error_parsing = true;
         }
-        
-        if (!error_parsing)
-        {
-            // Log the message
-            logger.Log(msg, connection_state, from);
-            replay_logger.Log(msg, connection_state, from);
-
-            // React to the message if necessary
-            msg->Dispatch(this);
-        }
     }
     else
     {
-        std::cout << ((from == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
-            "NULL MESSAGE WITH ID: " << minecraftID << std::endl;
+        std::cout << ((source == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
+            "NULL MESSAGE WITH ID: " << minecraft_id << std::endl;
+    }
+
+    if (!error_parsing)
+    {
+        // React to the message if necessary
+        msg->Dispatch(this);
+    }
+
+    // Transfer the data as they came
+    if (transmit_original_packet)
+    {
+        // The packet is transmitted, log is as it is
+        if (!error_parsing)
+        {
+            logger->Log(msg, connection_state, source);
+            if (replay_logger)
+            {
+                replay_logger->Log(msg, connection_state, source);
+            }
+        }
+
+        dst_connection.WriteData(&(*data), packet_length + packet_length_length);
+    }
+    // The packet has been replaced by something else, log it as intercepted by sniffcraft
+    else if (!error_parsing)
+    {
+        // The packet has been replaced, log it as intercepted by sniffcraft
+        logger->Log(msg, connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft);
+    }
+
+    // Return the number of bytes we read (or rather should have read in case of error)
+    return packet_length + packet_length_length;
+}
+
+size_t MinecraftProxy::Peek(std::vector<unsigned char>::const_iterator& data, size_t& length)
+{
+    try
+    {
+        return static_cast<size_t>(ProtocolCraft::ReadData<ProtocolCraft::VarInt>(data, length));
+    }
+    catch (const std::exception&)
+    {
+        return 0;
     }
 }
 
-const std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCraft::Message& msg)
+std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCraft::Message& msg) const
 {
     std::vector<unsigned char> content;
     msg.Write(content);
 
-    if (compression_threshold != -1)
+    if (compression_threshold > -1)
     {
         if (content.size() < compression_threshold)
         {
@@ -337,68 +171,23 @@ const std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCra
     }
 
     std::vector<unsigned char> sized_packet;
-    ProtocolCraft::WriteData<ProtocolCraft::VarInt>(content.size(), sized_packet);
-    sized_packet.insert(sized_packet.end(), content.begin(), content.end());
+    ProtocolCraft::WriteData<ProtocolCraft::VarInt>(static_cast<int>(content.size()), sized_packet);
+    sized_packet.insert(std::end(sized_packet), std::cbegin(content), std::cend(content));
     return sized_packet;
 }
 
-void MinecraftProxy::SendDataTo(const std::vector<unsigned char>& data, const Endpoint to)
+void MinecraftProxy::LoadConfig()
 {
-    if (to == Endpoint::Server)
-    {
-        std::lock_guard<std::mutex> lock(output_server_mutex_);
-        const bool write_in_progress = !output_server_data_.empty();
-        output_server_data_.push_back(data);
-
-        if (!write_in_progress)
-        {
-            // If we send to the server and encryption is
-            // enabled, we need to first encrypt the data
-#ifdef USE_ENCRYPTION
-            if (encrypter)
-            {
-                output_server_buffer_ = encrypter->Encrypt(output_server_data_.front());
-            }
-            else
-            {
-                output_server_buffer_ = output_server_data_.front();
-            }
-#else
-            output_server_buffer_ = output_server_data_.front();
-#endif
-            asio::async_write(server_socket_, asio::buffer(output_server_buffer_.data(), output_server_buffer_.size()),
-                std::bind(&MinecraftProxy::handle_server_write, this,
-                    std::placeholders::_1));
-        }
-    }
-    else
-    {
-        std::lock_guard<std::mutex> lock(output_client_mutex_);
-        const bool write_in_progress = !output_client_data_.empty();
-        output_client_data_.push_back(data);
-
-        if (!write_in_progress)
-        {
-            output_client_buffer_ = output_client_data_.front();
-            asio::async_write(client_socket_, asio::buffer(output_client_buffer_.data(), output_client_buffer_.size()),
-                std::bind(&MinecraftProxy::handle_client_write, this,
-                    std::placeholders::_1));
-        }
-    }
-}
-
-void MinecraftProxy::LoadConfig(const std::string& conf_path)
-{
-    if (conf_path.empty())
+    if (conf_path_.empty())
     {
         std::cerr << "Error, empty conf path" << std::endl;
         return;
     }
 
-    std::ifstream file = std::ifstream(conf_path, std::ios::in);
+    std::ifstream file = std::ifstream(conf_path_, std::ios::in);
     if (!file.is_open())
     {
-        std::cerr << "Error trying to open conf file: " << conf_path << "." << std::endl;
+        std::cerr << "Error trying to open conf file: " << conf_path_ << "." << std::endl;
         return;
     }
 
@@ -408,8 +197,13 @@ void MinecraftProxy::LoadConfig(const std::string& conf_path)
 
     if (!json.is_object())
     {
-        std::cerr << "Error parsing conf file at " << conf_path << "." << std::endl;
+        std::cerr << "Error parsing conf file at " << conf_path_ << "." << std::endl;
         return;
+    }
+
+    if (json.contains("LogToReplay") && json["LogToReplay"].get<bool>())
+    {
+        replay_logger = std::make_unique<ReplayModLogger>(conf_path_);
     }
 
 #ifdef USE_ENCRYPTION
@@ -438,14 +232,18 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg
 {
     connection_state = static_cast<ProtocolCraft::ConnectionState>(msg.GetIntention());
 
-    ProtocolCraft::ServerboundClientIntentionPacket replacement_intention_packet;
-    replacement_intention_packet.SetIntention(msg.GetIntention());
-    replacement_intention_packet.SetProtocolVersion(msg.GetProtocolVersion());
-    replacement_intention_packet.SetHostName(server_ip_);
-    replacement_intention_packet.SetPort(server_port_);
+    std::shared_ptr<ProtocolCraft::ServerboundClientIntentionPacket> replacement_intention_packet = std::make_shared<ProtocolCraft::ServerboundClientIntentionPacket>();
+    replacement_intention_packet->SetIntention(msg.GetIntention());
+    replacement_intention_packet->SetProtocolVersion(msg.GetProtocolVersion());
+    replacement_intention_packet->SetHostName(server_ip_);
+    replacement_intention_packet->SetPort(server_port_);
 
-    const std::vector<unsigned char> replacement_bytes = PacketToBytes(replacement_intention_packet);
-    client_replacement_data.insert(client_replacement_data.end(), replacement_bytes.begin(), replacement_bytes.end());
+    transmit_original_packet = false;
+    std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_intention_packet);
+    server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
+
+    logger->Log(replacement_intention_packet, connection_state, Endpoint::SniffcraftToServer);
+    // Don't replay log it as it's serverbound
 }
 
 void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
@@ -455,11 +253,11 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
     // of the profile we auth with
     if (authentifier)
     {
-        ProtocolCraft::ServerboundHelloPacket replacement_hello_packet;
+        std::shared_ptr<ProtocolCraft::ServerboundHelloPacket> replacement_hello_packet = std::make_shared<ProtocolCraft::ServerboundHelloPacket>();
 #if PROTOCOL_VERSION < 759
-        replacement_hello_packet.SetGameProfile(authentifier->GetPlayerDisplayName());
+        replacement_hello_packet->SetGameProfile(authentifier->GetPlayerDisplayName());
 #else
-        replacement_hello_packet.SetName(authentifier->GetPlayerDisplayName());
+        replacement_hello_packet->SetName(authentifier->GetPlayerDisplayName());
 
 #if PROTOCOL_VERSION < 761
         ProtocolCraft::ProfilePublicKey key;
@@ -472,15 +270,18 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
         }
         key.SetKey(key_bytes);
         key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
-        replacement_hello_packet.SetPublicKey(key);
+        replacement_hello_packet->SetPublicKey(key);
 #endif
 #if PROTOCOL_VERSION > 759
-        replacement_hello_packet.SetProfileId(authentifier->GetPlayerUUID());
+        replacement_hello_packet->SetProfileId(authentifier->GetPlayerUUID());
 #endif
 #endif
 
-        const std::vector<unsigned char> replacement_bytes = PacketToBytes(replacement_hello_packet);
-        client_replacement_data.insert(client_replacement_data.end(), replacement_bytes.begin(), replacement_bytes.end());
+        transmit_original_packet = false;
+        std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_hello_packet);
+        server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
+        logger->Log(replacement_hello_packet, connection_state, Endpoint::SniffcraftToServer);
+        // Don't replay log it as it's serverbound
     }
 #endif
 }
@@ -507,24 +308,24 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
         throw std::runtime_error("Not authenticated");
     }
 
-    std::unique_ptr<Botcraft::AESEncrypter> encrypter_ = std::make_unique<Botcraft::AESEncrypter>();
+    std::unique_ptr<Botcraft::AESEncrypter> encrypter = std::make_unique<Botcraft::AESEncrypter>();
 
     std::vector<unsigned char> raw_shared_secret;
     std::vector<unsigned char> encrypted_shared_secret;
 
 #if PROTOCOL_VERSION < 759
     std::vector<unsigned char> encrypted_nonce;
-    encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(),
+    encrypter->Init(msg.GetPublicKey(), msg.GetNonce(),
         raw_shared_secret, encrypted_nonce, encrypted_shared_secret);
 #elif PROTOCOL_VERSION < 761
     std::vector<unsigned char> salted_nonce_signature;
     long long int salt;
-    encrypter_->Init(msg.GetPublicKey(), msg.GetNonce(), authentifier->GetPrivateKey(),
+    encrypter->Init(msg.GetPublicKey(), msg.GetNonce(), authentifier->GetPrivateKey(),
         raw_shared_secret, encrypted_shared_secret,
         salt, salted_nonce_signature);
 #else
     std::vector<unsigned char> encrypted_challenge;
-    encrypter_->Init(msg.GetPublicKey(), msg.GetChallenge(),
+    encrypter->Init(msg.GetPublicKey(), msg.GetChallenge(),
         raw_shared_secret, encrypted_shared_secret, encrypted_challenge);
 #endif
 
@@ -547,17 +348,16 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 #endif
 
     // Send additional packet only to server on behalf of the client
-    SendDataTo(PacketToBytes(*response_msg), Endpoint::Server);
+    transmit_original_packet = false;
+    const std::vector<unsigned char> replacement_bytes = PacketToBytes(*response_msg);
+    server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
 
-    // Log this additional packet
-    logger.Log(response_msg, connection_state, Endpoint::SniffcraftToServer);
-    replay_logger.Log(response_msg, connection_state, Endpoint::SniffcraftToServer);
+    logger->Log(response_msg, connection_state, Endpoint::SniffcraftToServer);
 
     // Set the encrypter for any future message from the server
-    encrypter = std::move(encrypter_);
+    std::unique_ptr<DataProcessor> encryption_data_processor = std::make_unique<MinecraftEncryptionDataProcessor>(encrypter);
+    server_connection.SetDataProcessor(encryption_data_processor);
 
-    // Add only one byte in replacement data to signal that this packet should not be transmitted
-    server_replacement_data = { 0x00 };
 #else
     std::cerr << "WARNING, trying to connect to a server with encryption enabled\n" <<
         "but sniffcraft was built without encryption support." << std::endl;

@@ -83,7 +83,16 @@ void Logger::LogConsume()
 
             if (item.msg == nullptr)
             {
-                output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
+                output 
+                    << "["
+                    << hours
+                    << ":"
+                    << std::setw(2) << std::setfill('0') << min
+                    << ":"
+                    << std::setw(2) << std::setfill('0') << sec
+                    << ":"
+                    << std::setw(3) << std::setfill('0') << millisec
+                    << "] "
                     << OriginToString(item.origin) << " ";
                 output << "UNKNOWN OR WRONGLY PARSED MESSAGE";
                 const std::string output_str = output.str();
@@ -105,7 +114,16 @@ void Logger::LogConsume()
             const std::set<int>& detailed_set = detailed_packets[{item.connection_state, SimpleOrigin(item.origin)}];
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
 
-            output << "[" << hours << ":" << min << ":" << sec << ":" << millisec << "] "
+            output 
+                << "["
+                << hours
+                << ":"
+                << std::setw(2) << std::setfill('0') << min
+                << ":"
+                << std::setw(2) << std::setfill('0') << sec
+                << ":"
+                << std::setw(3) << std::setfill('0') << millisec
+                << "] "
                 << OriginToString(item.origin) << " ";
             output << item.msg->GetName();
             if (log_raw_bytes)
@@ -357,6 +375,10 @@ std::string Logger::OriginToString(const Endpoint origin) const
         return "[(SC) --> C]";
     case Endpoint::SniffcraftToServer:
         return "[(SC) --> S]";
+    case Endpoint::ClientToSniffcraft:
+        return "[C --> (SC)]";
+    case Endpoint::ServerToSniffcraft:
+        return "[S --> (SC)]";
     default:
         return "";
     }
@@ -372,6 +394,10 @@ Endpoint Logger::SimpleOrigin(const Endpoint origin) const
     case Endpoint::SniffcraftToClient:
         return Endpoint::Server;
     case Endpoint::SniffcraftToServer:
+        return Endpoint::Client;
+    case Endpoint::ServerToSniffcraft:
+        return Endpoint::Server;
+    case Endpoint::ClientToSniffcraft:
         return Endpoint::Client;
     default:
         return Endpoint::Client;

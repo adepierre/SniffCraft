@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
+#include <vector>
 #include <asio.hpp>
 
-class MinecraftProxy;
+#include "sniffcraft/BaseProxy.hpp"
 
 class Server
 {
@@ -12,8 +14,12 @@ public:
 
 private:
     void start_accept();
-    void handle_accept(MinecraftProxy* new_proxy, const asio::error_code &ec);
+    void handle_accept(BaseProxy* new_proxy, const asio::error_code &ec);
     void ResolveIpPortFromAddress(const std::string& address);
+
+    /// @brief Clean old proxies and get a fresh one ready
+    /// @return A pointer to a BaseProxy item
+    BaseProxy* GetNewProxy();
     
 private:
     asio::io_context& io_context_;
@@ -21,7 +27,10 @@ private:
 
     std::string server_ip_;
     unsigned short server_port_;
+    unsigned short client_port_;
 
     std::string conf_path;
+
+    std::vector<std::unique_ptr<BaseProxy>> proxies;
 };
 
