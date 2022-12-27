@@ -5,6 +5,9 @@
 #include "sniffcraft/BaseProxy.hpp"
 
 #ifdef USE_ENCRYPTION
+#if PROTOCOL_VERSION > 760
+#include <botcraft/Network/LastSeenMessagesTracker.hpp>
+#endif
 namespace Botcraft
 {
     class Authentifier;
@@ -45,6 +48,12 @@ private:
     virtual void Handle(ProtocolCraft::ClientboundGameProfilePacket& msg) override;
     virtual void Handle(ProtocolCraft::ClientboundLoginCompressionPacket& msg) override;
     virtual void Handle(ProtocolCraft::ClientboundHelloPacket& msg) override;
+#if USE_ENCRYPTION && PROTOCOL_VERSION > 760
+    virtual void Handle(ProtocolCraft::ClientboundLoginPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundChatPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundChatCommandPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundPlayerChatPacket& msg) override;
+#endif
 
 private:
     std::string conf_path_;
@@ -57,5 +66,10 @@ private:
     int compression_threshold;
 #ifdef USE_ENCRYPTION
     std::unique_ptr<Botcraft::Authentifier> authentifier;
+#if PROTOCOL_VERSION > 760
+    Botcraft::LastSeenMessagesTracker chat_context;
+    ProtocolCraft::UUID chat_session_uuid;
+    int message_sent_index;
+#endif
 #endif
 };

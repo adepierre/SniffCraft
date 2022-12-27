@@ -70,7 +70,7 @@ std::vector<unsigned char> CompressRawDeflate(const std::vector<unsigned char>& 
     return compressed_data;
 }
 
-std::vector<unsigned char> Decompress(const unsigned char* const compressed, const size_t size)
+std::vector<unsigned char> Decompress(const unsigned char* compressed, const size_t size)
 {
     std::vector<unsigned char> decompressed_data;
     decompressed_data.reserve(size);

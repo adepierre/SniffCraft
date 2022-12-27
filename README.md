@@ -10,7 +10,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 ## Features
 
 - Supported minecraft versions: all official releases from 1.12.2 to 1.19.3
-- Packet logging with different levels of details (ignor packet, log packet name only, log full packet content)
+- Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
 - Compression is supported
 - Offline ("cracked") mode and online mode (with Microsoft account) are supported
 - Secure chat is supported
@@ -21,28 +21,26 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 Here is an example of a captured session:
 ```javascript
-[0:1:98:98514] [S --> C] Level Event
-[0:1:100:100160] [S --> C] Level Event
-[0:1:100:100160] [S --> C] Level Event
-[0:1:111:111457] [C --> S] Container Click
+[0:00:48:050] [S --> C] Block Changed Ack
+[0:00:48:064] [C --> S] Swing
+[0:00:48:115] [C --> S] Swing
+[0:00:48:166] [C --> S] Swing
+[0:00:49:315] [C --> S] Use Item On
 {
-  "button_num": 0,
-  "carried_item": {
-    "present": false
-  },
-  "changed_slots": {
-    "46": {
-      "item_count": 1,
-      "item_id": 37,
-      "present": true
-    }
-  },
-  "click_type": 0,
-  "container_id": 6,
-  "slot_num": 46
+    "cursor_position_x": 0.0,
+    "cursor_position_y": 0.9097926616668701,
+    "cursor_position_z": 0.17363852262496948,
+    "direction": 4,
+    "hand": 0,
+    "inside": false,
+    "location": {
+        "x": -119,
+        "y": 83,
+        "z": 261
+    },
+    "sequence": 11
 }
-
-[0:2:122:122761] [S --> C] Player Info
+[0:00:49:348] [S --> C] Block Changed Ack
 ```
 
 
@@ -56,8 +54,8 @@ Depending on the version you are using, there are additional restrictions regard
 - for versions up to 1.18.2, you can use any client you want ("cracked" or regular with any account) as long as you are authenticated with a valid account in sniffcraft.
 - for versions 1.19 to 1.19.2, there are two subcases:
     - if the server has the option `enforce-secure-profile` set to false, then it's the same as for < 1.19 versions, you can use any client you want.
-    - if the server has the option `enforce-secure-profile` set to true, then you **must** use a client authenticated with the **same** account you are using in sniffcraft. Otherwise you will be kicked out for signing key mismatch as soon as you try to send a chat message.
-- for version 1.19.3, you can once again use any client you want ("cracked" or regular with any account). However, the server will refuse chat messages (without kicking you out though) if `enforce-secure-profile` is set to true as they won't be signed. Chat will probably be supported for this version when I figure out a way to do it properly.
+    - if the server has the option `enforce-secure-profile` set to true, then you **must** use a client authenticated with the **same** account you are using in Sniffcraft. Otherwise you will be kicked out for signing key mismatch as soon as you try to send a chat message.
+- for version 1.19.3, you can once again use any client you want ("cracked" or regular with any account). If connected on SniffCraft with a valid account, all the messages sent by the client will be signed by SniffCraft before being transmitted to the server.
 
 If you want to be sure Sniffcraft is using the latest certificates for your account (for 1.19+ versions), you can set botcraft_cached_credentials\["TheMicrosoftAccountCacheKeyYouSet"\]\["certificates"\]\["expires_date"\] to 0 and Sniffcraft will then retreive the latest ones from Mojang server.
 
