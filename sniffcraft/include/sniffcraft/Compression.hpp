@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cstddef>
 
 
 std::vector<unsigned char> Compress(const std::vector<unsigned char> &data);
