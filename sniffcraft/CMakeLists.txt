@@ -75,7 +75,7 @@ if(MSVC)
 endif()
 
 add_executable(sniffcraft ${sniffcraft_SRC} ${sniffcraft_PUBLIC_HDR})
-set_property(TARGET sniffcraft PROPERTY CXX_STANDARD 11)
+set_property(TARGET sniffcraft PROPERTY CXX_STANDARD 17)
 set_target_properties(sniffcraft PROPERTIES DEBUG_POSTFIX "_d")
 set_target_properties(sniffcraft PROPERTIES RELWITHDEBINFO_POSTFIX "_rd")
 
@@ -102,9 +102,6 @@ endif(MSVC)
 target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include")
 target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/include")
-target_include_directories(sniffcraft PUBLIC "${JSON_INCLUDE_DIR}")
-
-set_property(TARGET sniffcraft PROPERTY CXX_STANDARD 17)
 
 # Add Asio
 target_link_libraries(sniffcraft PUBLIC asio)

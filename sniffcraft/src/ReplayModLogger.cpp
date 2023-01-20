@@ -9,6 +9,8 @@
 #include <protocolCraft/Handler.hpp>
 #include <sniffcraft/FileUtilities.hpp>
 
+using namespace ProtocolCraft;
+
 ReplayModLogger::ReplayModLogger(const std::string &conf_path)
 {
     TryStart(conf_path);
@@ -37,7 +39,7 @@ ReplayModLogger::~ReplayModLogger()
     }
 }
 
-void ReplayModLogger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin)
+void ReplayModLogger::Log(const std::shared_ptr<Message> msg, const ConnectionState connection_state, const Endpoint origin)
 {
     if (!is_running)
     {
@@ -92,8 +94,8 @@ void ReplayModLogger::LogConsume()
             min -= hours * 60;
 
             if ((item.origin == Endpoint::Server || item.origin == Endpoint::SniffcraftToClient)
-                && (item.connection_state == ProtocolCraft::ConnectionState::Play ||
-                    (item.connection_state == ProtocolCraft::ConnectionState::Login && item.msg->GetId() == 0x02)))
+                && (item.connection_state == ConnectionState::Play ||
+                    (item.connection_state == ConnectionState::Login && item.msg->GetId() == 0x02)))
             {
                 std::vector<unsigned char> packet;
                 // Write ID + Packet data
@@ -101,11 +103,11 @@ void ReplayModLogger::LogConsume()
 
                 // Get total size
                 std::vector<unsigned char> packet_size;
-                ProtocolCraft::WriteData<int>(packet.size(), packet_size);
+                WriteData<int>(static_cast<int>(packet.size()), packet_size);
 
                 // Get timestamp in ms
                 std::vector<unsigned char> timestamp;
-                ProtocolCraft::WriteData<int>(total_millisec, timestamp);
+                WriteData<int>(static_cast<int>(total_millisec), timestamp);
 
                 replay_file.write((char*)timestamp.data(), timestamp.size());
                 replay_file.write((char*)packet_size.data(), packet_size.size());
@@ -117,11 +119,10 @@ void ReplayModLogger::LogConsume()
 
 void ReplayModLogger::TryStart(const std::string& conf_path)
 {
-    std::stringstream ss;
     std::ifstream file;
 
     bool error = conf_path == "";
-    nlohmann::json json;
+    Json::Value json;
 
     if (!error)
     {
@@ -133,11 +134,8 @@ void ReplayModLogger::TryStart(const std::string& conf_path)
         }
         if (!error)
         {
-            ss << file.rdbuf();
+            file >> json;
             file.close();
-
-            ss >> json;
-
 
             if (!json.is_object())
             {

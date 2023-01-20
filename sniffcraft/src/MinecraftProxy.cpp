@@ -1,9 +1,8 @@
 #include <iostream>
 
-#include <nlohmann/json.hpp>
-
 #include <protocolCraft/BinaryReadWrite.hpp>
 #include <protocolCraft/MessageFactory.hpp>
+#include <protocolCraft/Utilities/Json.hpp>
 
 #ifdef USE_ENCRYPTION
 #include <botcraft/Network/AESEncrypter.hpp>
@@ -21,12 +20,12 @@
 #include "sniffcraft/MinecraftEncryptionDataProcessor.hpp"
 #endif
 
-
+using namespace ProtocolCraft;
 
 MinecraftProxy::MinecraftProxy(asio::io_context& io_context, const std::string& conf_path) :
     BaseProxy(io_context)
 {
-    connection_state = ProtocolCraft::ConnectionState::Handshake;
+    connection_state = ConnectionState::Handshake;
     compression_threshold = -1;
     conf_path_ = conf_path;
 }
@@ -71,7 +70,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     std::vector<unsigned char> uncompressed;
     if (compression_threshold > -1)
     {
-        const int data_length = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(data_iterator, remaining_packet_bytes);
+        const int data_length = ReadData<VarInt>(data_iterator, remaining_packet_bytes);
         if (data_length != 0)
         {
             uncompressed = Decompress(&(*data_iterator), remaining_packet_bytes);
@@ -80,11 +79,11 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
         }
     }
 
-    const int minecraft_id = ProtocolCraft::ReadData<ProtocolCraft::VarInt>(data_iterator, remaining_packet_bytes);
+    const int minecraft_id = ReadData<VarInt>(data_iterator, remaining_packet_bytes);
 
-    std::shared_ptr<ProtocolCraft::Message> msg = source == Endpoint::Client ?
-        ProtocolCraft::MessageFactory::CreateMessageServerbound(minecraft_id, connection_state) :
-        ProtocolCraft::MessageFactory::CreateMessageClientbound(minecraft_id, connection_state);
+    std::shared_ptr<Message> msg = source == Endpoint::Client ?
+        CreateServerboundMessage(connection_state, minecraft_id) :
+        CreateClientboundMessage(connection_state, minecraft_id);
 
     // Clear the replacement bytes vector
     bool error_parsing = false;
@@ -144,7 +143,7 @@ size_t MinecraftProxy::Peek(std::vector<unsigned char>::const_iterator& data, si
 {
     try
     {
-        return static_cast<size_t>(ProtocolCraft::ReadData<ProtocolCraft::VarInt>(data, length));
+        return static_cast<size_t>(ReadData<VarInt>(data, length));
     }
     catch (const std::exception&)
     {
@@ -152,7 +151,7 @@ size_t MinecraftProxy::Peek(std::vector<unsigned char>::const_iterator& data, si
     }
 }
 
-std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCraft::Message& msg) const
+std::vector<unsigned char> MinecraftProxy::PacketToBytes(const Message& msg) const
 {
     std::vector<unsigned char> content;
     msg.Write(content);
@@ -169,13 +168,13 @@ std::vector<unsigned char> MinecraftProxy::PacketToBytes(const ProtocolCraft::Me
             std::vector<unsigned char> compressed_data = Compress(content);
             const int decompressed_size = static_cast<int>(content.size());
             content.clear();
-            ProtocolCraft::WriteData<ProtocolCraft::VarInt>(decompressed_size, content);
+            WriteData<VarInt>(decompressed_size, content);
             content.insert(content.end(), compressed_data.begin(), compressed_data.end());
         }
     }
 
     std::vector<unsigned char> sized_packet;
-    ProtocolCraft::WriteData<ProtocolCraft::VarInt>(static_cast<int>(content.size()), sized_packet);
+    WriteData<VarInt>(static_cast<int>(content.size()), sized_packet);
     sized_packet.insert(std::end(sized_packet), std::cbegin(content), std::cend(content));
     return sized_packet;
 }
@@ -195,9 +194,9 @@ void MinecraftProxy::LoadConfig()
         return;
     }
 
-    nlohmann::json json;
-
+    Json::Value json;
     file >> json;
+    file.close();
 
     if (!json.is_object())
     {
@@ -227,18 +226,18 @@ void MinecraftProxy::LoadConfig()
 #endif
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::Message& msg)
+void MinecraftProxy::Handle(Message& msg)
 {
 
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg)
+void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
 {
     transmit_original_packet = false;
 
-    connection_state = static_cast<ProtocolCraft::ConnectionState>(msg.GetIntention());
+    connection_state = static_cast<ConnectionState>(msg.GetIntention());
 
-    std::shared_ptr<ProtocolCraft::ServerboundClientIntentionPacket> replacement_intention_packet = std::make_shared<ProtocolCraft::ServerboundClientIntentionPacket>();
+    std::shared_ptr<ServerboundClientIntentionPacket> replacement_intention_packet = std::make_shared<ServerboundClientIntentionPacket>();
     replacement_intention_packet->SetIntention(msg.GetIntention());
     replacement_intention_packet->SetProtocolVersion(msg.GetProtocolVersion());
     replacement_intention_packet->SetHostName(server_ip_);
@@ -251,7 +250,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg
     // Don't replay log it as it's serverbound
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
+void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
 {
 #ifdef USE_ENCRYPTION
     if (authentifier == nullptr)
@@ -263,14 +262,14 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
 
     // Make sure we use the name and the signature key
     // of the profile we auth with
-    std::shared_ptr<ProtocolCraft::ServerboundHelloPacket> replacement_hello_packet = std::make_shared<ProtocolCraft::ServerboundHelloPacket>();
+    std::shared_ptr<ServerboundHelloPacket> replacement_hello_packet = std::make_shared<ServerboundHelloPacket>();
 #if PROTOCOL_VERSION < 759
     replacement_hello_packet->SetGameProfile(authentifier->GetPlayerDisplayName());
 #else
     replacement_hello_packet->SetName(authentifier->GetPlayerDisplayName());
 
 #if PROTOCOL_VERSION < 761
-    ProtocolCraft::ProfilePublicKey key;
+    ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
     const std::vector<unsigned char> key_bytes = Botcraft::RSAToBytes(authentifier->GetPublicKey());
     if (key_bytes != msg.GetPublicKey().GetKey())
@@ -294,17 +293,17 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundHelloPacket& msg)
 #endif
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ClientboundGameProfilePacket& msg)
+void MinecraftProxy::Handle(ClientboundGameProfilePacket& msg)
 {
-    connection_state = ProtocolCraft::ConnectionState::Play;
+    connection_state = ConnectionState::Play;
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ClientboundLoginCompressionPacket& msg)
+void MinecraftProxy::Handle(ClientboundLoginCompressionPacket& msg)
 {
     compression_threshold = msg.GetCompressionThreshold();
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
+void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
 {
 #ifdef USE_ENCRYPTION
     if (authentifier == nullptr)
@@ -341,14 +340,14 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 
     authentifier->JoinServer(msg.GetServerID(), raw_shared_secret, msg.GetPublicKey());
 
-    std::shared_ptr<ProtocolCraft::ServerboundKeyPacket> response_msg = std::make_shared<ProtocolCraft::ServerboundKeyPacket>();
+    std::shared_ptr<ServerboundKeyPacket> response_msg = std::make_shared<ServerboundKeyPacket>();
     response_msg->SetKeyBytes(encrypted_shared_secret);
 #if PROTOCOL_VERSION < 759
     // Pre-1.19 behaviour, send encrypted nonce
     response_msg->SetNonce(encrypted_nonce);
 #elif PROTOCOL_VERSION < 761
     // 1.19 - 1.19.2 behaviour, send salted nonce signature
-    ProtocolCraft::SaltSignature salt_signature;
+    SaltSignature salt_signature;
     salt_signature.SetSalt(salt);
     salt_signature.SetSignature(salted_nonce_signature);
     response_msg->SetSaltSignature(salt_signature);
@@ -375,23 +374,23 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundHelloPacket& msg)
 }
 
 #if USE_ENCRYPTION && PROTOCOL_VERSION > 760
-void MinecraftProxy::Handle(ProtocolCraft::ClientboundLoginPacket& msg)
+void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
 {
     if (authentifier == nullptr)
     {
         return;
     }
 
-    std::shared_ptr<ProtocolCraft::ServerboundChatSessionUpdatePacket> chat_session_msg = std::make_shared<ProtocolCraft::ServerboundChatSessionUpdatePacket>();
-    ProtocolCraft::RemoteChatSessionData chat_session_data;
+    std::shared_ptr<ServerboundChatSessionUpdatePacket> chat_session_msg = std::make_shared<ServerboundChatSessionUpdatePacket>();
+    RemoteChatSessionData chat_session_data;
 
-    ProtocolCraft::ProfilePublicKey key;
+    ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
     key.SetKey(Botcraft::RSAToBytes(authentifier->GetPublicKey()));
     key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
 
     chat_session_data.SetProfilePublicKey(key);
-    chat_session_uuid = ProtocolCraft::UUID();
+    chat_session_uuid = UUID();
     std::mt19937 rnd = std::mt19937(static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()));
     std::uniform_int_distribution<int> distrib(std::numeric_limits<unsigned char>::min(), std::numeric_limits<unsigned char>::max());
     for (size_t i = 0; i < chat_session_uuid.size(); ++i)
@@ -408,7 +407,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ClientboundLoginPacket& msg)
     logger->Log(chat_session_msg, connection_state, Endpoint::SniffcraftToServer);
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ServerboundChatPacket& msg)
+void MinecraftProxy::Handle(ServerboundChatPacket& msg)
 {
     if (authentifier == nullptr)
     {
@@ -423,7 +422,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundChatPacket& msg)
 #undef GetMessage
 #endif
 
-    std::shared_ptr<ProtocolCraft::ServerboundChatPacket> replacement_chat_packet = std::make_shared<ProtocolCraft::ServerboundChatPacket>();
+    std::shared_ptr<ServerboundChatPacket> replacement_chat_packet = std::make_shared<ServerboundChatPacket>();
     replacement_chat_packet->SetMessage(msg.GetMessage());
 
     long long int salt, timestamp;
@@ -451,7 +450,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundChatPacket& msg)
     logger->Log(replacement_chat_packet, connection_state, Endpoint::SniffcraftToServer);
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ServerboundChatCommandPacket& msg)
+void MinecraftProxy::Handle(ServerboundChatCommandPacket& msg)
 {
     if (authentifier == nullptr)
     {
@@ -460,7 +459,7 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundChatCommandPacket& msg)
 
     transmit_original_packet = false;
 
-    std::shared_ptr<ProtocolCraft::ServerboundChatCommandPacket> replacement_chat_command = std::make_shared<ProtocolCraft::ServerboundChatCommandPacket>();
+    std::shared_ptr<ServerboundChatCommandPacket> replacement_chat_command = std::make_shared<ServerboundChatCommandPacket>();
     replacement_chat_command->SetCommand(msg.GetCommand());
     replacement_chat_command->SetTimestamp(msg.GetTimestamp());
     replacement_chat_command->SetSalt(msg.GetSalt());
@@ -473,20 +472,20 @@ void MinecraftProxy::Handle(ProtocolCraft::ServerboundChatCommandPacket& msg)
     logger->Log(replacement_chat_command, connection_state, Endpoint::SniffcraftToServer);
 }
 
-void MinecraftProxy::Handle(ProtocolCraft::ClientboundPlayerChatPacket& msg)
+void MinecraftProxy::Handle(ClientboundPlayerChatPacket& msg)
 {
     if (authentifier == nullptr)
     {
         return;
     }
 
-    if (!msg.GetSignature().empty())
+    if (msg.GetSignature().has_value())
     {
-        chat_context.AddSeenMessage(msg.GetSignature());
+        chat_context.AddSeenMessage(msg.GetSignature().value());
 
         if (chat_context.GetOffset() > 64)
         {
-            std::shared_ptr<ProtocolCraft::ServerboundChatAckPacket> ack_msg = std::make_shared<ProtocolCraft::ServerboundChatAckPacket>();
+            std::shared_ptr<ServerboundChatAckPacket> ack_msg = std::make_shared<ServerboundChatAckPacket>();
             ack_msg->SetOffset(chat_context.GetAndResetOffset());
 
             const std::vector<unsigned char> replacement_bytes_ack = PacketToBytes(*ack_msg);

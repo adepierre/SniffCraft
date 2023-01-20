@@ -65,7 +65,6 @@ If you want to be sure Sniffcraft is using the latest certificates for your acco
 You don't have to install any dependency to build SniffCraft, everything that is not already on your system will be automatically downloaded and locally built during the build process.
 
 - [asio](https://think-async.com/Asio/)
-- [nlohmann json](https://github.com/nlohmann/json)
 - [zlib](https://github.com/madler/zlib)
 - [openssl](https://www.openssl.org/) (optional, only if cmake option SNIFFCRAFT_WITH_ENCRYPTION is set)
 - [botcraft](https://github.com/adepierre/botcraft)

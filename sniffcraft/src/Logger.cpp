@@ -8,6 +8,8 @@
 #include <protocolCraft/Handler.hpp>
 #include <sniffcraft/FileUtilities.hpp>
 
+using namespace ProtocolCraft;
+
 Logger::Logger(const std::string &conf_path)
 {
     logconf_path = conf_path;
@@ -35,7 +37,7 @@ Logger::~Logger()
     }
 }
 
-void Logger::Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin)
+void Logger::Log(const std::shared_ptr<Message> msg, const ConnectionState connection_state, const Endpoint origin)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
     if (!log_file.is_open())
@@ -138,7 +140,7 @@ void Logger::LogConsume()
             }
             if (is_detailed)
             {
-                output << "\n" << item.msg->Serialize().dump(4);
+                output << "\n" << item.msg->Serialize().Dump(4);
             }
 
             const std::string output_str = output.str();
@@ -171,11 +173,9 @@ void Logger::LoadConfig(const std::string& path)
     last_time_log_file_modified = modification_time;
     std::cout << "Loading updated conf file..." << std::endl;
 
-    std::stringstream ss;
     std::ifstream file;
-
     bool error = path == "";
-    nlohmann::json json;
+    Json::Value json;
 
     if (!error)
     {
@@ -187,10 +187,7 @@ void Logger::LoadConfig(const std::string& path)
         }
         if (!error)
         {
-            ss << file.rdbuf();
-            file.close();
-
-            ss >> json;
+            file >> json;
 
             if (!json.is_object())
             {
@@ -198,6 +195,7 @@ void Logger::LoadConfig(const std::string& path)
                 error = true;
             }
         }
+        file.close();
     }
 
     //Create default conf
@@ -206,11 +204,11 @@ void Logger::LoadConfig(const std::string& path)
         return;
     }
 
-    const std::map<std::string, ProtocolCraft::ConnectionState> name_mapping = {
-        {"Handshaking", ProtocolCraft::ConnectionState::Handshake},
-        {"Status", ProtocolCraft::ConnectionState::Status},
-        {"Login", ProtocolCraft::ConnectionState::Login},
-        {"Play", ProtocolCraft::ConnectionState::Play}
+    const std::map<std::string, ConnectionState> name_mapping = {
+        {"Handshaking", ConnectionState::Handshake},
+        {"Status", ConnectionState::Status},
+        {"Login", ConnectionState::Login},
+        {"Play", ConnectionState::Play}
     };
 
     log_to_console = false;
@@ -243,14 +241,13 @@ void Logger::LoadConfig(const std::string& path)
         }
         else
         {
-            const nlohmann::json null_value = nlohmann::json();
-            LoadPacketsFromJson(null_value, it->second);
+            LoadPacketsFromJson(Json::Value(), it->second);
         }
     }
     std::cout << "Conf file loaded!" << std::endl;
 }
 
-void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraft::ConnectionState connection_state)
+void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState connection_state)
 {
     ignored_packets[{connection_state, Endpoint::Client}] = std::set<int>();
     ignored_packets[{connection_state, Endpoint::Server}] = std::set<int>();
@@ -264,20 +261,19 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
 
     if (value.contains("ignored_clientbound") && value["ignored_clientbound"].is_array())
     {
-        const nlohmann::json& ignored = value["ignored_clientbound"];
-        for (auto it = ignored.begin(); it != ignored.end(); ++it)
+        for (const auto& val : value["ignored_clientbound"].get_array())
         {
-            if (it->is_number_integer())
+            if (val.is_number())
             {
-                ignored_packets[{connection_state, Endpoint::Server}].insert(it->get<int>());
+                ignored_packets[{connection_state, Endpoint::Server}].insert(val.get<int>());
             }
-            else if (it->is_string())
+            else if (val.is_string())
             {
                 // Search for the matching id
                 for (int j = 0; j < 150; ++j)
                 {
-                    auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
-                    if (msg && msg->GetName() == it->get<std::string>())
+                    const std::shared_ptr<Message> msg = CreateClientboundMessage(connection_state, j);
+                    if (msg && msg->GetName() == val.get<std::string>())
                     {
                         ignored_packets[{connection_state, Endpoint::Server}].insert(j);
                         break;
@@ -289,20 +285,19 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
 
     if (value.contains("ignored_serverbound") && value["ignored_serverbound"].is_array())
     {
-        const nlohmann::json& ignored = value["ignored_serverbound"];
-        for (auto it = ignored.begin(); it != ignored.end(); ++it)
+        for (const auto& val : value["ignored_serverbound"].get_array())
         {
-            if (it->is_number_integer())
+            if (val.is_number())
             {
-                ignored_packets[{connection_state, Endpoint::Client}].insert(it->get<int>());
+                ignored_packets[{connection_state, Endpoint::Client}].insert(val.get<int>());
             }
-            else if (it->is_string())
+            else if (val.is_string())
             {
                 // Search for the matching id
                 for (int j = 0; j < 150; ++j)
                 {
-                    auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
-                    if (msg && msg->GetName() == it->get<std::string>())
+                    const std::shared_ptr<Message> msg = CreateServerboundMessage(connection_state, j);
+                    if (msg && msg->GetName() == val.get<std::string>())
                     {
                         ignored_packets[{connection_state, Endpoint::Client}].insert(j);
                         break;
@@ -314,20 +309,19 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
 
     if (value.contains("detailed_clientbound") && value["detailed_clientbound"].is_array())
     {
-        const nlohmann::json& detailed = value["detailed_clientbound"];
-        for (auto it = detailed.begin(); it != detailed.end(); ++it)
+        for (const auto& val : value["detailed_clientbound"].get_array())
         {
-            if (it->is_number_integer())
+            if (val.is_number())
             {
-                detailed_packets[{connection_state, Endpoint::Server}].insert(it->get<int>());
+                detailed_packets[{connection_state, Endpoint::Server}].insert(val.get<int>());
             }
-            else if (it->is_string())
+            else if (val.is_string())
             {
                 // Search for the matching id
                 for (int j = 0; j < 150; ++j)
                 {
-                    auto msg = ProtocolCraft::MessageFactory::CreateMessageClientbound(j, connection_state);
-                    if (msg && msg->GetName() == it->get<std::string>())
+                    const std::shared_ptr<Message> msg = CreateClientboundMessage(connection_state, j);
+                    if (msg && msg->GetName() == val.get<std::string>())
                     {
                         detailed_packets[{connection_state, Endpoint::Server}].insert(j);
                         break;
@@ -339,20 +333,19 @@ void Logger::LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraf
 
     if (value.contains("detailed_serverbound") && value["detailed_serverbound"].is_array())
     {
-        const nlohmann::json& detailed = value["detailed_serverbound"];
-        for (auto it = detailed.begin(); it != detailed.end(); ++it)
+        for (const auto& val : value["detailed_serverbound"].get_array())
         {
-            if (it->is_number_integer())
+            if (val.is_number())
             {
-                detailed_packets[{connection_state, Endpoint::Client}].insert(it->get<int>());
+                detailed_packets[{connection_state, Endpoint::Client}].insert(val.get<int>());
             }
-            else if (it->is_string())
+            else if (val.is_string())
             {
                 // Search for the matching id
                 for (int j = 0; j < 150; ++j)
                 {
-                    auto msg = ProtocolCraft::MessageFactory::CreateMessageServerbound(j, connection_state);
-                    if (msg && msg->GetName() == it->get<std::string>())
+                    const std::shared_ptr<Message> msg = CreateServerboundMessage(connection_state, j);
+                    if (msg && msg->GetName() == val.get<std::string>())
                     {
                         detailed_packets[{connection_state, Endpoint::Client}].insert(j);
                         break;

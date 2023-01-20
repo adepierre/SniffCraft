@@ -11,9 +11,6 @@ option(SNIFFCRAFT_FORCE_LOCAL_OPENSSL "Force using a local install of openSSL ev
 # Add Asio
 include("${CMAKE_SOURCE_DIR}/cmake/asio.cmake")
 
-# Add json
-include("${CMAKE_SOURCE_DIR}/cmake/json.cmake")
-
 # Add Zlib
 include("${CMAKE_SOURCE_DIR}/cmake/zlib.cmake")
 

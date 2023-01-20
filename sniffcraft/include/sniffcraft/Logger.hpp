@@ -5,8 +5,7 @@
 
 #include <protocolCraft/enums.hpp>
 #include <protocolCraft/Message.hpp>
-
-#include <nlohmann/json.hpp>
+#include <protocolCraft/Utilities/Json.hpp>
 
 #include <thread>
 #include <mutex>
@@ -28,7 +27,7 @@ public:
 private:
     void LogConsume();
     void LoadConfig(const std::string& path);
-    void LoadPacketsFromJson(const nlohmann::json& value, const ProtocolCraft::ConnectionState connection_state);
+    void LoadPacketsFromJson(const ProtocolCraft::Json::Value& value, const ProtocolCraft::ConnectionState connection_state);
     std::string OriginToString(const Endpoint origin) const;
     Endpoint SimpleOrigin(const Endpoint origin) const;
 
