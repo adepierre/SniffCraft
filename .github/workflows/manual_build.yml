@@ -100,6 +100,10 @@ jobs:
 
       - name: Comment on associated issue
         if: ${{ github.event.inputs.issue }}
-        run: gh issue comment ${{ github.event.inputs.issue }} --repo ${{ github.repository }} -b "New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ github.event.inputs.minecraft_version }}\nYou can now close this issue. Feel free to reopen it anytime if you need an updated build for the same version."
+        run: |
+          echo New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ github.event.inputs.minecraft_version }} > body.txt
+          echo -en '\n' >> body.txt
+          echo You can now close this issue. Feel free to reopen at anytime if you need an updated build for the same version. >> body.txt
+          gh issue comment ${{ github.event.inputs.issue }} --repo ${{ github.repository }} --body-file body.txt
         env:
           GH_TOKEN: ${{ github.token }}
