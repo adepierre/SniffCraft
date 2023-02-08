@@ -41,7 +41,15 @@ jobs:
       - name: Configure cmake
         shell: bash
         working-directory: ${{ runner.workspace }}/build
-        run: cmake -G "${{ matrix.config.generator }}" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DGAME_VERSION=latest -DSNIFFCRAFT_WITH_ENCRYPTION=ON -DSNIFFCRAFT_FORCE_LOCAL_ZLIB=ON -DSNIFFCRAFT_FORCE_LOCAL_OPENSSL=ON -S $GITHUB_WORKSPACE -B .
+        run: >
+          cmake -G "${{ matrix.config.generator }}"
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+          -DGAME_VERSION=latest
+          -DSNIFFCRAFT_WITH_ENCRYPTION=ON
+          -DSNIFFCRAFT_FORCE_LOCAL_ZLIB=ON
+          -DSNIFFCRAFT_FORCE_LOCAL_OPENSSL=ON
+          -S $GITHUB_WORKSPACE
+          -B .
 
       - name: Build
         shell: bash
@@ -63,6 +71,37 @@ jobs:
           path: ${{ runner.workspace }}/build/version.txt
           retention-days: 1
 
+      - name: Retrieve MC game version
+        if: ${{ matrix.config.name == 'Linux' }}
+        id: mc-version
+        uses: juliangruber/read-file-action@v1
+        with:
+          path:
+            ${{ runner.workspace }}/build/version.txt
+
+      - name: Create release note
+        if: ${{ matrix.config.name == 'Linux' }}
+        run: |
+            echo Automatically generated binaries with the latest version of the code for Minecraft ${{ steps.mc-version.outputs.content }}. > release_note.txt
+            echo -en '\n' >> release_note.txt
+            echo Examples of conf files can be found [here](https://github.com/${{ github.repository }}/tree/master/conf). >> release_note.txt
+            echo -en '\n' >> release_note.txt
+            echo "💡 If you need binaries for a previous version of Minecraft, you can open [an issue using this link](https://github.com/${{ github.repository }}/issues/new?assignees=&labels=version+request&template=version-request.yml&title=%5BVersion+request%5D) and it will be automagically generated for you in a few minutes." >> release_note.txt
+            echo -en '\n' >> release_note.txt
+            echo **Changes:** >> release_note.txt
+
+      - name: Append git commits
+        if: ${{ matrix.config.name == 'Linux' }}
+        run: git log latest..HEAD --oneline --no-merges >> release_note.txt
+
+      - name: Upload release note
+        if: ${{ matrix.config.name == 'Linux' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: release_note
+          path: release_note.txt
+          retention-days: 1
+
   update_latest:
     runs-on: ubuntu-latest
     needs: build
@@ -80,6 +119,12 @@ jobs:
           path:
             version/version.txt
 
+      - name: Download release note
+        uses: actions/download-artifact@v3
+        with:
+          name: release_note
+          path: release_note
+
       - name: Remove old latest release
         uses: cb80/delrel@latest
         with:
@@ -95,10 +140,7 @@ jobs:
       - name: Create new latest release
         uses: softprops/action-gh-release@v1
         with:
-          body: |
-            Automatically generated binaries with the latest version of the code for Minecraft ${{ steps.mc-version.outputs.content }}.
-            
-            Examples of conf files can be found [here](https://github.com/adepierre/SniffCraft/tree/master/conf).
+          body_path: release_note/release_note.txt            
           draft: false
           prerelease: false
           name: Latest

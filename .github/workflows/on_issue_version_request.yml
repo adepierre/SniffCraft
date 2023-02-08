@@ -1,0 +1,41 @@
+name: Build version on issue request
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  compile_if_requested:
+    runs-on: ubuntu-latest
+    steps:
+      - id: check
+        name: Check if issue is a request
+        run: echo "is_valid_request=${{ startsWith(github.event.issue.title, '[Version request]') }}" >> $GITHUB_OUTPUT
+
+      - id: retrieve
+        name: Retrieve the version from body
+        if: ${{ steps.check.outputs.is_valid_request == 'true' }}
+        run: echo "version="$(echo "${{ github.event.issue.body }}" | tail -n1) >> $GITHUB_OUTPUT
+
+      - id: exist
+        name: Check if version already exists in release
+        if: ${{ steps.check.outputs.is_valid_request == 'true' }}
+        run: echo "value="$(gh release view latest --repo ${{ github.repository }} --json assets -q "[.assets.[].name | select(endswith(\"${{ steps.retrieve.outputs.version }}\"))] | length") >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - id: trigger
+        name: Trigger manual build
+        if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.exist.outputs.value == 0 }}
+        run: |
+          gh workflow run manual_build.yml --repo ${{ github.repository }} -f minecraft_version=${{ steps.retrieve.outputs.version }} -f issue=${{ github.event.issue.html_url }}
+          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. Subscribe to this issue to be notified when binaries are ready."
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - id: redirect_to_release
+        name: Redirect to already existing binaries
+        if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.exist.outputs.value != 0 }}
+        run: gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Binaries for ${{ steps.retrieve.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest).\nYou can close this issue. Feel free to reopen it anytime if you need an updated build for the same version."
+        env:
+          GH_TOKEN: ${{ github.token }}
