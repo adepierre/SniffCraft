@@ -84,9 +84,9 @@ jobs:
         run: |
             echo Automatically generated binaries with the latest version of the code for Minecraft ${{ steps.mc-version.outputs.content }}. > release_note.txt
             echo -en '\n' >> release_note.txt
-            echo Examples of conf files can be found [here](https://github.com/${{ github.repository }}/tree/master/conf). >> release_note.txt
+            echo "Examples of conf files can be found [here](https://github.com/${{ github.repository }}/tree/master/conf)." >> release_note.txt
             echo -en '\n' >> release_note.txt
-            echo "💡 If you need binaries for a previous version of Minecraft, you can open [an issue using this link]\(https://github.com/${{ github.repository }}/issues/new?assignees=&labels=version+request&template=version-request.yml&title=%5BVersion+request%5D\) and it will be automagically generated for you in a few minutes." >> release_note.txt
+            echo "💡 If you need binaries for a previous version of Minecraft, you can open [an issue using this link](https://github.com/${{ github.repository }}/issues/new?assignees=&labels=version+request&template=version-request.yml&title=%5BVersion+request%5D) and it will be automagically generated for you in a few minutes." >> release_note.txt
             echo -en '\n' >> release_note.txt
             echo **Changes:** >> release_note.txt
 
