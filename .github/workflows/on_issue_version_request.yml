@@ -29,13 +29,17 @@ jobs:
         if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.exist.outputs.value == 0 }}
         run: |
           gh workflow run manual_build.yml --repo ${{ github.repository }} -f minecraft_version=${{ steps.retrieve.outputs.version }} -f issue=${{ github.event.issue.html_url }}
-          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. Subscribe to this issue to be notified when binaries are ready."
+          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. You can follow the build progress [here](https://github.com/${{ github.repository }}/actions) or subscribe to this issue to be notified when binaries are ready."
         env:
           GH_TOKEN: ${{ github.token }}
 
       - id: redirect_to_release
         name: Redirect to already existing binaries
         if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.exist.outputs.value != 0 }}
-        run: gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Binaries for ${{ steps.retrieve.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest).\nYou can close this issue. Feel free to reopen it anytime if you need an updated build for the same version."
+        run: |
+          echo "Binaries for ${{ steps.retrieve.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." > body.txt
+          echo -en '\n' >> body.txt
+          echo You can close this issue. Feel free to reopen at anytime if you need an updated build for the same version. >> body.txt
+          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} --body-file body.txt
         env:
           GH_TOKEN: ${{ github.token }}
