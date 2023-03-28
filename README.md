@@ -9,7 +9,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.19.3
+- Supported minecraft versions: all official releases from 1.12.2 to 1.19.4
 - Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
 - Compression is supported
 - Offline ("cracked") mode and online mode (with Microsoft account) are supported
