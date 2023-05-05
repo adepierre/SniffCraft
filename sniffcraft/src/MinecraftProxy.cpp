@@ -104,6 +104,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     {
         std::cout << ((source == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
             "NULL MESSAGE WITH ID: " << minecraft_id << std::endl;
+        error_parsing = true;
     }
 
     transmit_original_packet = true;
