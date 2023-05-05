@@ -108,6 +108,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     }
 
     transmit_original_packet = true;
+    const ConnectionState old_connection_state = connection_state;
     if (!error_parsing)
     {
         // React to the message if necessary
@@ -133,7 +134,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     else if (!error_parsing)
     {
         // The packet has been replaced, log it as intercepted by sniffcraft
-        logger->Log(msg, connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft);
+        logger->Log(msg, old_connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft);
     }
 
     // Return the number of bytes we read (or rather should have read in case of error)
@@ -236,18 +237,26 @@ void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
 {
     transmit_original_packet = false;
 
+    const ConnectionState old_connection_state = connection_state;
     connection_state = static_cast<ConnectionState>(msg.GetIntention());
 
     std::shared_ptr<ServerboundClientIntentionPacket> replacement_intention_packet = std::make_shared<ServerboundClientIntentionPacket>();
     replacement_intention_packet->SetIntention(msg.GetIntention());
     replacement_intention_packet->SetProtocolVersion(msg.GetProtocolVersion());
-    replacement_intention_packet->SetHostName(server_ip_);
+    std::string new_hostname = server_ip_;
+    const size_t old_hostname_strlen = strlen(msg.GetHostName().c_str());
+    // Forge adds \0FML\0, \0FML2\0 or \0FML3\0 to the hostname
+    if (msg.GetHostName().size() > old_hostname_strlen)
+    {
+        new_hostname += msg.GetHostName().substr(old_hostname_strlen);
+    }
+    replacement_intention_packet->SetHostName(new_hostname);
     replacement_intention_packet->SetPort(server_port_);
 
     std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_intention_packet);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
 
-    logger->Log(replacement_intention_packet, connection_state, Endpoint::SniffcraftToServer);
+    logger->Log(replacement_intention_packet, old_connection_state, Endpoint::SniffcraftToServer);
     // Don't replay log it as it's serverbound
 }
 
