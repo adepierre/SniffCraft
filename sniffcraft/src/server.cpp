@@ -42,7 +42,7 @@ void Server::start_accept()
         std::bind(&Server::handle_accept, this, proxy,
             std::placeholders::_1));
 
-    std::cout << "Waiting connection on 127.0.0.1:" << client_port_ << std::endl;
+    std::cout << "Ready to redirect any client connection on 127.0.0.1:" << client_port_ << " to " << server_ip_ << ":" << server_port_ << std::endl;
 }
 
 void Server::handle_accept(BaseProxy* new_proxy, const asio::error_code& ec)
