@@ -139,20 +139,20 @@ void Connection::handle_read(const asio::error_code& ec, const size_t bytes_tran
         return;
     }
 
-    std::vector<unsigned char>& data = read_buffer;
+    const std::vector<unsigned char>* data = &read_buffer;
     size_t length = bytes_transferred;
 
     std::vector<unsigned char> processed_data;
     if (data_processor != nullptr)
     {
-        processed_data = data_processor->ProcessIncomingData({ data.begin(), data.begin() + length });
-        data = processed_data;
+        processed_data = data_processor->ProcessIncomingData({ data->begin(), data->begin() + length });
+        data = &processed_data;
         length = processed_data.size();
     }
 
     {
         std::lock_guard<std::mutex> received_lock(received_mutex);
-        ready_received_data.insert(ready_received_data.end(), data.begin(), data.begin() + length);
+        ready_received_data.insert(ready_received_data.end(), data->begin(), data->begin() + length);
 
         // We need to protect the callback call in the mutex scope
         // otherwise we could have data in the buffer without the
