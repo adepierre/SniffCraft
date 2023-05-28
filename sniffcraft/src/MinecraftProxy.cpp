@@ -283,7 +283,7 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
     ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
     const std::vector<unsigned char> key_bytes = Botcraft::RSAToBytes(authentifier->GetPublicKey());
-    if (key_bytes != msg.GetPublicKey().value().GetKey())
+    if (!msg.GetPublicKey().has_value() || key_bytes != msg.GetPublicKey().value().GetKey())
     {
         std::cerr << "WARNING, public key mismatch between client and sniffcraft.\n"
             << "You might get kicked out if you send a chat message" << std::endl;
