@@ -29,6 +29,8 @@ Logger::~Logger()
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
+    log_file << GenerateNetworkRecap() << std::endl;
+
     log_file.close();
 
     if (log_thread.joinable())
@@ -37,7 +39,7 @@ Logger::~Logger()
     }
 }
 
-void Logger::Log(const std::shared_ptr<Message> msg, const ConnectionState connection_state, const Endpoint origin)
+void Logger::Log(const std::shared_ptr<Message>& msg, const ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
     if (!log_file.is_open())
@@ -51,7 +53,7 @@ void Logger::Log(const std::shared_ptr<Message> msg, const ConnectionState conne
         log_file = std::ofstream(ss.str() + "_log.txt", std::ios::out);
     }
 
-    logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin });
+    logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin, bandwidth_bytes });
     log_condition.notify_all();
 }
 
@@ -85,7 +87,7 @@ void Logger::LogConsume()
 
             if (item.msg == nullptr)
             {
-                output 
+                output
                     << "["
                     << hours
                     << ":"
@@ -106,6 +108,34 @@ void Logger::LogConsume()
                 continue;
             }
 
+            // Update network recap data
+            if (item.connection_state == ConnectionState::Play && item.bandwidth_bytes > 0)
+            {
+                const Endpoint simple_origin = SimpleOrigin(item.origin);
+                std::map<std::string, NetworkRecapItem>& recap_data_map = simple_origin == Endpoint::Server ? clientbound_network_recap_data : serverbound_network_recap_data;
+
+                // Get Network recap key (packet name + identifier if custom payload)
+                std::string map_key(item.msg->GetName());
+                if (simple_origin == Endpoint::Server && item.msg->GetId() == ProtocolCraft::ClientboundCustomPayloadPacket::packet_id)
+                {
+                    std::shared_ptr<ProtocolCraft::ClientboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ProtocolCraft::ClientboundCustomPayloadPacket>(item.msg);
+                    map_key += "|" + custom_payload->GetIdentifier();
+                }
+                else if (simple_origin == Endpoint::Client && item.msg->GetId() == ProtocolCraft::ServerboundCustomPayloadPacket::packet_id)
+                {
+                    std::shared_ptr<ProtocolCraft::ServerboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ProtocolCraft::ServerboundCustomPayloadPacket>(item.msg);
+                    map_key += "|" + custom_payload->GetIdentifier();
+                }
+
+                NetworkRecapItem& recap = recap_data_map[map_key];
+                recap.count += 1;
+                recap.bandwidth_bytes += item.bandwidth_bytes;
+
+                NetworkRecapItem& total_recap_item = simple_origin == Endpoint::Server ? clientbound_total_network_recap : serverbound_total_network_recap;
+                total_recap_item.count += 1;
+                total_recap_item.bandwidth_bytes += item.bandwidth_bytes;
+            }
+
             const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
             const bool is_ignored = ignored_set.find(item.msg->GetId()) != ignored_set.end();
             if (is_ignored)
@@ -116,7 +146,7 @@ void Logger::LogConsume()
             const std::set<int>& detailed_set = detailed_packets[{item.connection_state, SimpleOrigin(item.origin)}];
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
 
-            output 
+            output
                 << "["
                 << hours
                 << ":"
@@ -152,10 +182,17 @@ void Logger::LogConsume()
 
             // Every 5 seconds, check if the conf file has changed and reload it if needed
             std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-            if (now - last_time_checked_log_file > 5)
+            if (now - last_time_checked_conf_file > 5)
             {
-                last_time_checked_log_file = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                last_time_checked_conf_file = now;
                 LoadConfig(logconf_path);
+            }
+
+            // Every 10 seconds, print network recap if option is true
+            if (log_network_recap_console && now - last_time_network_recap_printed > 10)
+            {
+                last_time_network_recap_printed = now;
+                std::cout << GenerateNetworkRecap(10, 18) << std::endl;
             }
         }
     }
@@ -165,12 +202,12 @@ void Logger::LoadConfig(const std::string& path)
 {
     std::time_t modification_time = GetModifiedTimestamp(path);
     if (modification_time == -1 ||
-        modification_time == last_time_log_file_modified)
+        modification_time == last_time_conf_file_modified)
     {
         return;
     }
 
-    last_time_log_file_modified = modification_time;
+    last_time_conf_file_modified = modification_time;
     std::cout << "Loading updated conf file..." << std::endl;
 
     std::ifstream file;
@@ -220,6 +257,15 @@ void Logger::LoadConfig(const std::string& path)
     else
     {
         log_to_console = json["LogToConsole"].get<bool>();
+    }
+
+    if (!json.contains("NetworkRecapToConsole"))
+    {
+        log_network_recap_console = false;
+    }
+    else
+    {
+        log_network_recap_console = json["NetworkRecapToConsole"].get<bool>();
     }
 
     log_raw_bytes = false;
@@ -395,4 +441,434 @@ Endpoint Logger::SimpleOrigin(const Endpoint origin) const
     default:
         return Endpoint::Client;
     }
+}
+
+using map_it = std::map<std::string, NetworkRecapItem>::const_iterator;
+std::string ReportTable(
+    const NetworkRecapItem& clientbound_total,
+    const NetworkRecapItem& serverbound_total,
+    const std::vector<map_it>& clientbound_items,
+    const std::vector<map_it>& serverbound_items,
+    const int max_entry,
+    const int max_name_size
+)
+{
+    // Get max width of column "Name"
+    int clientbound_max_name_length = 0;
+    for (int i = 0; i < clientbound_items.size(); ++i)
+    {
+        if (i == max_entry)
+        {
+            break;
+        }
+        if (clientbound_items[i]->first.size() > clientbound_max_name_length)
+        {
+            clientbound_max_name_length = clientbound_items[i]->first.size();
+        }
+    }
+    int serverbound_max_name_length = 0;
+    for (int i = 0; i < serverbound_items.size(); ++i)
+    {
+        if (i == max_entry)
+        {
+            break;
+        }
+        if (serverbound_items[i]->first.size() > serverbound_max_name_length)
+        {
+            serverbound_max_name_length = serverbound_items[i]->first.size();
+        }
+    }
+
+    // In case there is no entry, "Total".size() is the width of the column
+    clientbound_max_name_length = std::max(5, clientbound_max_name_length);
+    serverbound_max_name_length = std::max(5, serverbound_max_name_length);
+    if (max_name_size > -1)
+    {
+        clientbound_max_name_length = std::min(max_name_size, clientbound_max_name_length);
+        serverbound_max_name_length = std::min(max_name_size, serverbound_max_name_length);
+    }
+
+    // We don't need to make sure  it's > "Count".size() because there is already the (XX.XX%) content in the column
+    const int clientbound_max_count_size = clientbound_total.count == 0 ? 1 : static_cast<int>(std::log10(clientbound_total.count) + 1);
+    const int serverbound_max_count_size = serverbound_total.count == 0 ? 1 : static_cast<int>(std::log10(serverbound_total.count) + 1);
+
+    // We don't need to make sure  it's > "Bandwidth".size() because there is already the (XX.XX%) content in the column
+    const int clientbound_max_bandwidth_size = clientbound_total.bandwidth_bytes == 0 ? 1 : static_cast<int>(std::log10(clientbound_total.bandwidth_bytes) + 1);
+    const int serverbound_max_bandwidth_size = serverbound_total.bandwidth_bytes == 0 ? 1 : static_cast<int>(std::log10(serverbound_total.bandwidth_bytes) + 1);
+
+    const int clientbound_total_width = clientbound_max_name_length + clientbound_max_count_size + clientbound_max_bandwidth_size + 26;
+    const int serverbound_total_width = serverbound_max_name_length + serverbound_max_count_size + serverbound_max_bandwidth_size + 26;
+
+    std::stringstream output;
+    // +=============================+  +=============================+
+    output << '+';
+    for (int i = 0; i < clientbound_total_width; ++i)
+    {
+        output << '=';
+    }
+    output << "+  +";
+    for (int i = 0; i < serverbound_total_width; ++i)
+    {
+        output << '=';
+    }
+    output << "+\n";
+
+    // |      Client --> Server      |  |      Server --> Client      |
+    constexpr int header_size = 17;
+    output << '|';
+    for (int i = 0; i < (clientbound_total_width - header_size) / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "Server -" << (clientbound_total_width % 2 ? "" : "-") << "-> Client";
+    for (int i = 0; i < (clientbound_total_width - header_size) / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "|  |";
+    for (int i = 0; i < (serverbound_total_width - header_size) / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "Client -" << (serverbound_total_width % 2 ? "" : "-") << "-> Server";
+    for (int i = 0; i < (serverbound_total_width - header_size) / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "|\n";
+
+    // +=========================+  +===========================+
+    output << '+';
+    for (int i = 0; i < clientbound_total_width; ++i)
+    {
+        output << '=';
+    }
+    output << "+  +";
+    for (int i = 0; i < serverbound_total_width; ++i)
+    {
+        output << '=';
+    }
+    output << "+\n";
+
+    // | Name | Count | Bandwidth |  | Name | Count | Bandwidth |
+    output << '|';
+    for (int i = 0; i < clientbound_max_name_length / 2 - 1; ++i)
+    {
+        output << ' ';
+    }
+    output << "Name";
+    for (int i = 0; i < clientbound_max_name_length / 2 - 1 + clientbound_max_name_length % 2; ++i)
+    {
+        output << ' ';
+    }
+    output << '|';
+    for (int i = 0; i < 3 + clientbound_max_count_size / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "Count";
+    for (int i = 0; i < 3 + clientbound_max_count_size / 2 + clientbound_max_count_size % 2; ++i)
+    {
+        output << ' ';
+    }
+    output << '|';
+    for (int i = 0; i < 1 + clientbound_max_bandwidth_size / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "Bandwidth";
+    for (int i = 0; i < 1 + clientbound_max_bandwidth_size / 2 + clientbound_max_bandwidth_size % 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "|  |";
+    for (int i = 0; i < serverbound_max_name_length / 2 - 1; ++i)
+    {
+        output << ' ';
+    }
+    output << "Name";
+    for (int i = 0; i < serverbound_max_name_length / 2 - 1 + serverbound_max_name_length % 2; ++i)
+    {
+        output << ' ';
+    }
+    output << '|';
+    for (int i = 0; i < 3 + serverbound_max_count_size / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "Count";
+    for (int i = 0; i < 3 + serverbound_max_count_size / 2 + serverbound_max_count_size % 2; ++i)
+    {
+        output << ' ';
+    }
+    output << '|';
+    for (int i = 0; i < 1 + serverbound_max_bandwidth_size / 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "Bandwidth";
+    for (int i = 0; i < 1 + serverbound_max_bandwidth_size / 2 + serverbound_max_bandwidth_size % 2; ++i)
+    {
+        output << ' ';
+    }
+    output << "|\n";
+
+    // +------+------+------+  +------+------+------+
+    output << '+';
+    for (int i = 0; i < clientbound_max_name_length + 2; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < clientbound_max_count_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < clientbound_max_bandwidth_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << "+  +";
+    for (int i = 0; i < serverbound_max_name_length + 2; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < serverbound_max_count_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < serverbound_max_bandwidth_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << "+\n";
+
+    // | Total | NNNNN (100.0%) | NNNNN (100.0%) |  | Total | NNNNN (100.0%) | NNNNN (100.0%) |
+    output << '|';
+    output << " Total";
+    for (int i = 0; i < 1 + clientbound_max_name_length - 5; ++i)
+    {
+        output << ' ';
+    }
+    output << "| "
+        << std::setw(clientbound_max_count_size) << clientbound_total.count
+        << " (100.0%) ";
+    output << "| "
+        << std::setw(clientbound_max_bandwidth_size) << clientbound_total.bandwidth_bytes
+        << " (100.0%) ";
+    output << "|  |";
+    output << " Total";
+    for (int i = 0; i < 1 + serverbound_max_name_length - 5; ++i)
+    {
+        output << ' ';
+    }
+    output << "| "
+        << std::setw(serverbound_max_count_size) << serverbound_total.count
+        << " (100.0%) ";
+    output << "| "
+        << std::setw(serverbound_max_bandwidth_size) << serverbound_total.bandwidth_bytes
+        << " (100.0%) ";
+    output << "|\n";
+
+    // | Name | NNNNN (XX.XX%) | NNNNN (XX.XX%) |  | Name | NNNNN (XX.XX%) | NNNNN (XX.XX%) |
+    for (int idx = 0; idx < std::max(clientbound_items.size(), serverbound_items.size()); ++idx)
+    {
+        if (idx == max_entry)
+        {
+            break;
+        }
+        output << "| ";
+        if (idx < clientbound_items.size())
+        {
+            if (max_name_size > -1 && clientbound_items[idx]->first.size() > max_name_size)
+            {
+                output << clientbound_items[idx]->first.substr(0, std::max(1, max_name_size - 3)) << "... ";
+            }
+            else
+            {
+                output << clientbound_items[idx]->first;
+                for (int i = 0; i < 1 + clientbound_max_name_length - clientbound_items[idx]->first.size(); ++i)
+                {
+                    output << ' ';
+                }
+            }
+            output << "| ";
+            output << std::setw(clientbound_max_count_size) << clientbound_items[idx]->second.count
+                << " ("
+                << std::setw(5) << std::fixed << std::setprecision(2) << 100.0f * static_cast<float>(clientbound_items[idx]->second.count) / clientbound_total.count
+                << "%) | ";
+            output << std::setw(clientbound_max_bandwidth_size) << clientbound_items[idx]->second.bandwidth_bytes
+                << " ("
+                << std::setw(5) << std::fixed << std::setprecision(2) << 100.0f * static_cast<float>(clientbound_items[idx]->second.bandwidth_bytes) / clientbound_total.bandwidth_bytes
+                << "%) |";
+        }
+        else
+        {
+            for (int i = 0; i < clientbound_max_name_length; ++i)
+            {
+                output << ' ';
+            }
+            output << " | ";
+            for (int i = 0; i < clientbound_max_count_size + 9; ++i)
+            {
+                output << ' ';
+            }
+            output << " | ";
+            for (int i = 0; i < clientbound_max_bandwidth_size + 9; ++i)
+            {
+                output << ' ';
+            }
+            output << " |";
+        }
+        output << "  ";
+        output << "| ";
+        if (idx < serverbound_items.size())
+        {
+            if (max_name_size > -1 && serverbound_items[idx]->first.size() > max_name_size)
+            {
+                output << serverbound_items[idx]->first.substr(0, std::max(1, max_name_size - 3)) << "... ";
+            }
+            else
+            {
+                output << serverbound_items[idx]->first;
+                for (int i = 0; i < 1 + serverbound_max_name_length - serverbound_items[idx]->first.size(); ++i)
+                {
+                    output << ' ';
+                }
+            }
+            output << "| ";
+            output << std::setw(serverbound_max_count_size) << serverbound_items[idx]->second.count
+                << " ("
+                << std::setw(5) << std::fixed << std::setprecision(2) << 100.0f * static_cast<float>(serverbound_items[idx]->second.count) / serverbound_total.count
+                << "%) | ";
+            output << std::setw(serverbound_max_bandwidth_size) << serverbound_items[idx]->second.bandwidth_bytes
+                << " ("
+                << std::setw(5) << std::fixed << std::setprecision(2) << 100.0f * static_cast<float>(serverbound_items[idx]->second.bandwidth_bytes) / serverbound_total.bandwidth_bytes
+                << "%) |";
+        }
+        else
+        {
+            for (int i = 0; i < serverbound_max_name_length; ++i)
+            {
+                output << ' ';
+            }
+            output << " | ";
+            for (int i = 0; i < serverbound_max_count_size + 9; ++i)
+            {
+                output << ' ';
+            }
+            output << " | ";
+            for (int i = 0; i < serverbound_max_bandwidth_size + 9; ++i)
+            {
+                output << ' ';
+            }
+            output << " |";
+        }
+        output << "\n";
+    }
+
+    // +------+------+------+  +------+------+------+
+    output << '+';
+    for (int i = 0; i < clientbound_max_name_length + 2; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < clientbound_max_count_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < clientbound_max_bandwidth_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << "+  +";
+    for (int i = 0; i < serverbound_max_name_length + 2; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < serverbound_max_count_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << '+';
+    for (int i = 0; i < serverbound_max_bandwidth_size + 2 + 9; ++i)
+    {
+        output << '-';
+    }
+    output << "+\n";
+
+    return output.str();
+}
+
+std::string Logger::GenerateNetworkRecap(const int max_entry, const int max_name_size) const
+{
+    std::vector<map_it> clientbound_recap_iterators_sorted_count;
+    std::vector<map_it> clientbound_recap_iterators_sorted_size;
+    clientbound_recap_iterators_sorted_count.reserve(clientbound_network_recap_data.size());
+    clientbound_recap_iterators_sorted_size.reserve(clientbound_network_recap_data.size());
+    for (auto it = clientbound_network_recap_data.begin(); it != clientbound_network_recap_data.end(); ++it)
+    {
+        clientbound_recap_iterators_sorted_count.push_back(it);
+        clientbound_recap_iterators_sorted_size.push_back(it);
+    }
+    std::sort(clientbound_recap_iterators_sorted_count.begin(), clientbound_recap_iterators_sorted_count.end(),
+        [](const map_it& a, const map_it& b)
+        {
+            return a->second.count > b->second.count;
+        });
+    std::sort(clientbound_recap_iterators_sorted_size.begin(), clientbound_recap_iterators_sorted_size.end(),
+        [](const map_it& a, const map_it& b)
+        {
+            return a->second.bandwidth_bytes > b->second.bandwidth_bytes;
+        });
+
+
+    std::vector<map_it> serverbound_recap_iterators_sorted_count;
+    std::vector<map_it> serverbound_recap_iterators_sorted_size;
+    serverbound_recap_iterators_sorted_count.reserve(serverbound_network_recap_data.size());
+    serverbound_recap_iterators_sorted_size.reserve(serverbound_network_recap_data.size());
+    for (auto it = serverbound_network_recap_data.begin(); it != serverbound_network_recap_data.end(); ++it)
+    {
+        serverbound_recap_iterators_sorted_count.push_back(it);
+        serverbound_recap_iterators_sorted_size.push_back(it);
+    }
+    std::sort(serverbound_recap_iterators_sorted_count.begin(), serverbound_recap_iterators_sorted_count.end(),
+        [](const map_it& a, const map_it& b)
+        {
+            return a->second.count > b->second.count;
+        });
+    std::sort(serverbound_recap_iterators_sorted_size.begin(), serverbound_recap_iterators_sorted_size.end(),
+        [](const map_it& a, const map_it& b)
+        {
+            return a->second.bandwidth_bytes > b->second.bandwidth_bytes;
+        });
+
+    std::stringstream output;
+    if (max_entry > -1)
+    {
+        output << "Top " << max_entry << ", sorted by count:\n";
+    }
+    else
+    {
+        output << "Sorted by count:\n";
+    }
+    output << ReportTable(clientbound_total_network_recap, serverbound_total_network_recap, clientbound_recap_iterators_sorted_count, serverbound_recap_iterators_sorted_count, max_entry, max_name_size);
+    output << "\n\n";
+    if (max_entry > -1)
+    {
+        output << "Top " << max_entry << ", sorted by bandwidth:\n";
+    }
+    else
+    {
+        output << "Sorted by bandwidth:\n";
+    }
+    output << ReportTable(clientbound_total_network_recap, serverbound_total_network_recap, clientbound_recap_iterators_sorted_size, serverbound_recap_iterators_sorted_size, max_entry, max_name_size);
+
+    return output.str();
 }

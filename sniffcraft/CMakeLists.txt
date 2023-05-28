@@ -11,6 +11,7 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/LogItem.hpp
     include/sniffcraft/MinecraftEncryptionDataProcessor.hpp
     include/sniffcraft/MinecraftProxy.hpp
+    include/sniffcraft/NetworkRecapItem.hpp
     include/sniffcraft/ReplayModLogger.hpp
     include/sniffcraft/server.hpp
     

@@ -14,4 +14,5 @@ struct LogItem
     std::chrono::time_point<std::chrono::system_clock> date;
     ProtocolCraft::ConnectionState connection_state;
     Endpoint origin;
+    size_t bandwidth_bytes;
 };

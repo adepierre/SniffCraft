@@ -3,7 +3,7 @@
 
 # SniffCraft
 
-SniffCraft is a cross-platform C++ proxy which let you inspect the content of each packet sent through any minecraft client and server. 
+SniffCraft is a cross-platform C++ proxy which let you inspect the content of each packet sent through any minecraft client and server.
 
 It works as a man-in-the-middle: instead of connecting directly to the server, you ask your client to connect to SniffCraft which then is connected to the server. All packets are transmitted to their original recipient and are simultaneously logged on-the-fly.
 
@@ -28,6 +28,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Logging raw packets at byte level
 - Configuration (which packet to log/ignore) can be changed without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
+- Create a network summary at the end of the session with number of packets sent/received
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
 
 Here is an example of a captured session:
@@ -53,6 +54,27 @@ Here is an example of a captured session:
 }
 [0:00:49:348] [S --> C] Block Changed Ack
 ```
+And an example of the summary you can find at the end of the session logfile:
+```bash
++============================================================+  +================================================================+
+|                     Server ---> Client                     |  |                       Client ---> Server                       |
++============================================================+  +================================================================+
+|          Name          |     Count      |    Bandwidth     |  |              Name              |    Count     |   Bandwidth    |
++------------------------+----------------+------------------+  +--------------------------------+--------------+----------------+
+| Total                  | 23862 (100.0%) | 8340248 (100.0%) |  | Total                          | 902 (100.0%) | 28156 (100.0%) |
+| Level Chunk With Light |  1558 ( 6.53%) | 7988945 (95.79%) |  | Move Player PosRot             | 481 (53.33%) | 17316 (61.50%) |
+| Move Entity PosRot     |  4001 (16.77%) |   55894 ( 0.67%) |  | Move Player Pos                | 368 (40.80%) | 10304 (36.60%) |
+| Move Entity Pos        |  4495 (18.84%) |   53568 ( 0.64%) |  | Move Player Rot                |  19 ( 2.11%) |   228 ( 0.81%) |
+| Set Entity Motion      |  3854 (16.15%) |   42083 ( 0.50%) |  | Player Command                 |  26 ( 2.88%) |   182 ( 0.65%) |
+| Rotate Head            |  6240 (26.15%) |   36836 ( 0.44%) |  | Chat Command                   |   1 ( 0.11%) |    42 ( 0.15%) |
+| Set Entity Data        |   745 ( 3.12%) |   27726 ( 0.33%) |  | Keep Alive                     |   3 ( 0.33%) |    33 ( 0.12%) |
+| Light Update           |    66 ( 0.28%) |   23880 ( 0.29%) |  | Custom Payload|minecraft:brand |   1 ( 0.11%) |    27 ( 0.10%) |
+| Add Entity             |   373 ( 1.56%) |   20832 ( 0.25%) |  | Client Information             |   1 ( 0.11%) |    16 ( 0.06%) |
+| Update Recipes         |     1 ( 0.00%) |   19738 ( 0.24%) |  | Accept Teleportation           |   1 ( 0.11%) |     4 ( 0.01%) |
+| Update Attributes      |   330 ( 1.38%) |   15965 ( 0.19%) |  | Move Player Status Only        |   1 ( 0.11%) |     4 ( 0.01%) |
+| Forget Level Chunk     |  1160 ( 4.86%) |   12760 ( 0.15%) |  |                                |              |                |
++------------------------+----------------+------------------+  +--------------------------------+--------------+----------------+
+```
 
 
 ### Encryption is supported
@@ -64,10 +86,16 @@ There are two options in the conf file regarding authentication. ``Online`` must
 Depending on the version you are using, there are additional restrictions regarding authentication:
 - for versions up to 1.18.2 and 1.19.3+, you can use any client you want ("cracked" or regular with any account) as long as you are authenticated with a valid account in sniffcraft.
 - for versions 1.19 to 1.19.2, there are two subcases:
-    - if the server has the option `enforce-secure-profile` set to false, then it's the same as for < 1.19 versions, you can use any client you want.
+    - if the server has the option `enforce-secure-profile` set to false, then it's the same as for the other versions, you can use any client you want.
     - if the server has the option `enforce-secure-profile` set to true, then you **must** use a client authenticated with the **same** account you are using in Sniffcraft. Otherwise you will be kicked out for signing key mismatch as soon as you try to send a chat message.
 
 If you want to be sure Sniffcraft is using the latest certificates for your account (for 1.19+ versions), you can set botcraft_cached_credentials\["TheMicrosoftAccountCacheKeyYouSet"\]\["certificates"\]\["expires_date"\] to 0 and Sniffcraft will then retreive the latest ones from Mojang server.
+
+### Mod support
+
+Sniffcraft has been confirmed to work with heavily modded client/server using Forge. It is however not regularly tested against all possible modded environments and some adjustments might be required in some cases. If you find such a case, please open an issue or join the [community discord server](https://discord.gg/wECVsTbjA9) and describe the usecase with as much details as possible (minecraft version, server IP, client/server mods etc...).
+
+If you want to print the content of Custom Payload packets (both from client and server), you need to use protocolCraft plugins to extend the protocol knowledge with mod-specific packets. See the [protocolCraft-plugin](https://github.com/adepierre/protocolcraft-plugin) repo for details.
 
 
 ## Dependencies

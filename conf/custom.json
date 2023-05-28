@@ -3,6 +3,7 @@
     "LogToReplay": false,
     "LogRawBytes": false,
     "Online": false,
+    "NetworkRecapToConsole": false,
     "MicrosoftAccountCacheKey": "",
     "Handshaking": {
         "ignored_clientbound" : [

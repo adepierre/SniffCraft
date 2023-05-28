@@ -121,7 +121,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
         // The packet is transmitted, log it as it is
         if (!error_parsing)
         {
-            logger->Log(msg, connection_state, source);
+            logger->Log(msg, connection_state, source, packet_length + packet_length_length);
             if (replay_logger)
             {
                 replay_logger->Log(msg, connection_state, source);
@@ -134,7 +134,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     else if (!error_parsing)
     {
         // The packet has been replaced, log it as intercepted by sniffcraft
-        logger->Log(msg, old_connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft);
+        logger->Log(msg, old_connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft, packet_length + packet_length_length);
     }
 
     // Return the number of bytes we read (or rather should have read in case of error)
@@ -256,7 +256,8 @@ void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
     std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_intention_packet);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
 
-    logger->Log(replacement_intention_packet, old_connection_state, Endpoint::SniffcraftToServer);
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(replacement_intention_packet, old_connection_state, Endpoint::SniffcraftToServer, 0);
     // Don't replay log it as it's serverbound
 }
 
@@ -298,7 +299,8 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
 
     std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_hello_packet);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
-    logger->Log(replacement_hello_packet, connection_state, Endpoint::SniffcraftToServer);
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(replacement_hello_packet, connection_state, Endpoint::SniffcraftToServer, 0);
     // Don't replay log it as it's serverbound
 #endif
 }
@@ -370,7 +372,8 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
     const std::vector<unsigned char> replacement_bytes = PacketToBytes(*response_msg);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
 
-    logger->Log(response_msg, connection_state, Endpoint::SniffcraftToServer);
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(response_msg, connection_state, Endpoint::SniffcraftToServer, 0);
 
     // Set the encrypter for any future message from the server
     std::unique_ptr<DataProcessor> encryption_data_processor = std::make_unique<MinecraftEncryptionDataProcessor>(encrypter);
@@ -414,7 +417,8 @@ void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
 
     server_connection.WriteData(chat_session_msg_bytes.data(), chat_session_msg_bytes.size());
 
-    logger->Log(chat_session_msg, connection_state, Endpoint::SniffcraftToServer);
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(chat_session_msg, connection_state, Endpoint::SniffcraftToServer, 0);
 }
 
 void MinecraftProxy::Handle(ServerboundChatPacket& msg)
@@ -457,7 +461,8 @@ void MinecraftProxy::Handle(ServerboundChatPacket& msg)
 
     const std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_chat_packet);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
-    logger->Log(replacement_chat_packet, connection_state, Endpoint::SniffcraftToServer);
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(replacement_chat_packet, connection_state, Endpoint::SniffcraftToServer, 0);
 }
 
 void MinecraftProxy::Handle(ServerboundChatCommandPacket& msg)
@@ -479,7 +484,8 @@ void MinecraftProxy::Handle(ServerboundChatCommandPacket& msg)
 
     const std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_chat_command);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
-    logger->Log(replacement_chat_command, connection_state, Endpoint::SniffcraftToServer);
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(replacement_chat_command, connection_state, Endpoint::SniffcraftToServer, 0);
 }
 
 void MinecraftProxy::Handle(ClientboundPlayerChatPacket& msg)
@@ -500,7 +506,8 @@ void MinecraftProxy::Handle(ClientboundPlayerChatPacket& msg)
 
             const std::vector<unsigned char> replacement_bytes_ack = PacketToBytes(*ack_msg);
             server_connection.WriteData(replacement_bytes_ack.data(), replacement_bytes_ack.size());
-            logger->Log(ack_msg, connection_state, Endpoint::SniffcraftToServer);
+            // We don't log packet size as it's not really part of the network data
+            logger->Log(ack_msg, connection_state, Endpoint::SniffcraftToServer, 0);
         }
     }
 }
