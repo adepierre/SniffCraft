@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <cmath>
 
 #include <protocolCraft/MessageFactory.hpp>
 #include <protocolCraft/Handler.hpp>
