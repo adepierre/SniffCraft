@@ -22,13 +22,13 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 - Supported minecraft versions: all official releases from 1.12.2 to 1.19.4
 - Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
+- Detailed network usage recap at the end of the session
 - Compression is supported
 - Offline ("cracked") mode and online mode (with Microsoft account) are supported
 - Secure chat is supported
 - Logging raw packets at byte level
-- Configuration (which packet to log/ignore) can be changed without restarting
+- Configuration (which packet to log/ignore) can be changed on-the-fly without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
-- Create a network summary at the end of the session with number of packets sent/received
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
 
 Here is an example of a captured session:
