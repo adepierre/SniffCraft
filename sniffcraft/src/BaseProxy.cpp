@@ -7,6 +7,7 @@ BaseProxy::BaseProxy(asio::io_context& io_context) :
     client_connection(io_context),
     server_connection(io_context)
 {
+    started = false;
     closed = true;
 }
 
@@ -45,6 +46,7 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
     }
 
     closed = false;
+    started = true;
 
     // Once connected, we can start the processing thread
     process_data_ready = false;
@@ -79,6 +81,11 @@ void BaseProxy::Close()
     client_connection.Close();
     server_connection.Close();
     closed = true;
+}
+
+bool BaseProxy::Started()
+{
+    return started;
 }
 
 bool BaseProxy::Running()

@@ -31,6 +31,7 @@ Server::Server(asio::io_context& io_context, const unsigned short client_port,
     client_port_(client_port)
 {
     ResolveIpPortFromAddress(server_address);
+    proxies_cleaning_thread = std::thread(&Server::CleanProxies, this);
     start_accept();
 }
 
@@ -159,18 +160,29 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
 
 BaseProxy* Server::GetNewProxy()
 {
-    // Clean old proxies
-    for (int i = proxies.size() - 1; i > -1; --i)
-    {
-        if (!proxies[i]->Running())
-        {
-            proxies.erase(proxies.begin() + i);
-        }
-    }
-
-    // If we are here, it means there is no available proxy, create a new one
+    std::lock_guard<std::mutex> lock(proxies_mutex);
+    // Create a new proxy
     std::unique_ptr<BaseProxy> proxy = std::make_unique<MinecraftProxy>(io_context_, conf_path);
     proxies.push_back(std::move(proxy));
 
     return proxies.back().get();
+}
+
+void Server::CleanProxies()
+{
+    while (true)
+    {
+        {
+            std::lock_guard<std::mutex> lock(proxies_mutex);
+            // Clean old proxies
+            for (int i = proxies.size() - 1; i > -1; --i)
+            {
+                if (proxies[i]->Started() && !proxies[i]->Running())
+                {
+                    proxies.erase(proxies.begin() + i);
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }

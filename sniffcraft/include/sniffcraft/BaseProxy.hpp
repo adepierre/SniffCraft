@@ -28,6 +28,7 @@ public:
     /// @return A reference to the client socket
     asio::ip::tcp::socket& ClientSocket();
 
+    bool Started();
     bool Running();
 
 protected:
@@ -87,4 +88,5 @@ private:
 
     std::atomic<bool> process_data_ready;
     std::atomic<bool> closed;
+    std::atomic<bool> started;
 };

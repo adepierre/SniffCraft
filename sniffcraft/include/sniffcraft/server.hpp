@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <thread>
 #include <asio.hpp>
 
 #include "sniffcraft/BaseProxy.hpp"
@@ -20,6 +21,8 @@ private:
     /// @brief Clean old proxies and get a fresh one ready
     /// @return A pointer to a BaseProxy item
     BaseProxy* GetNewProxy();
+
+    void CleanProxies();
     
 private:
     asio::io_context& io_context_;
@@ -32,5 +35,7 @@ private:
     std::string conf_path;
 
     std::vector<std::unique_ptr<BaseProxy>> proxies;
+    std::mutex proxies_mutex;
+    std::thread proxies_cleaning_thread;
 };
 
