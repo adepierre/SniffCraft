@@ -1,4 +1,5 @@
 {
+    "LogToFile": true,
     "LogToConsole": false,
     "LogToReplay": false,
     "LogRawBytes": false,

@@ -44,6 +44,7 @@ private:
     std::string logconf_path;
     std::ofstream log_file;
     bool is_running;
+    bool log_to_file;
     bool log_to_console;
     bool log_raw_bytes;
     bool log_network_recap_console;

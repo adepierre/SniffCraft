@@ -30,9 +30,11 @@ Logger::~Logger()
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    log_file << GenerateNetworkRecap() << std::endl;
-
-    log_file.close();
+    if (log_to_file)
+    {
+        log_file << GenerateNetworkRecap() << std::endl;
+        log_file.close();
+    }
 
     if (log_thread.joinable())
     {
@@ -43,7 +45,7 @@ Logger::~Logger()
 void Logger::Log(const std::shared_ptr<Message>& msg, const ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
-    if (!log_file.is_open())
+    if (log_to_file && !log_file.is_open())
     {
         start_time = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
@@ -101,7 +103,10 @@ void Logger::LogConsume()
                     << OriginToString(item.origin) << " ";
                 output << "UNKNOWN OR WRONGLY PARSED MESSAGE";
                 const std::string output_str = output.str();
-                log_file << output_str << std::endl;
+                if (log_to_file)
+                {
+                    log_file << output_str << std::endl;
+                }
                 if (log_to_console)
                 {
                     std::cout << output_str << std::endl;
@@ -175,7 +180,10 @@ void Logger::LogConsume()
             }
 
             const std::string output_str = output.str();
-            log_file << output_str << std::endl;
+            if (log_to_file)
+            {
+                log_file << output_str << std::endl;
+            }
             if (log_to_console)
             {
                 std::cout << output_str << std::endl;
@@ -248,6 +256,13 @@ void Logger::LoadConfig(const std::string& path)
         {"Login", ConnectionState::Login},
         {"Play", ConnectionState::Play}
     };
+
+    log_to_file = true;
+
+    if (json.contains("LogToFile") && !json["LogToFile"].get<bool>())
+    {
+        log_to_file = false;
+    }
 
     log_to_console = false;
 
