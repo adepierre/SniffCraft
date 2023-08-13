@@ -8,3 +8,4 @@ if(RES_LEN EQUAL 0)
 endif()
 
 set(BOTCRAFT_OUTPUT_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Base output build path for protocolCraft")
+set(PROTOCOLCRAFT_STATIC ON)

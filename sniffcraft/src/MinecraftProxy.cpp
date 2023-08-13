@@ -313,14 +313,14 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
 #if PROTOCOL_VERSION < 761
     ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
-    const std::vector<unsigned char> key_bytes = Botcraft::RSAToBytes(authentifier->GetPublicKey());
+    const std::vector<unsigned char> key_bytes = Botcraft::Utilities::RSAToBytes(authentifier->GetPublicKey());
     if (!msg.GetPublicKey().has_value() || key_bytes != msg.GetPublicKey().value().GetKey())
     {
         std::cerr << "WARNING, public key mismatch between client and sniffcraft.\n"
             << "You might get kicked out if you send a chat message" << std::endl;
     }
     key.SetKey(key_bytes);
-    key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
+    key.SetSignature(Botcraft::Utilities::DecodeBase64(authentifier->GetKeySignature()));
     replacement_hello_packet->SetPublicKey(key);
 #endif
 #if PROTOCOL_VERSION > 759
@@ -430,8 +430,8 @@ void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
 
     ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
-    key.SetKey(Botcraft::RSAToBytes(authentifier->GetPublicKey()));
-    key.SetSignature(Botcraft::DecodeBase64(authentifier->GetKeySignature()));
+    key.SetKey(Botcraft::Utilities::RSAToBytes(authentifier->GetPublicKey()));
+    key.SetSignature(Botcraft::Utilities::DecodeBase64(authentifier->GetKeySignature()));
 
     chat_session_data.SetProfilePublicKey(key);
     chat_session_uuid = UUID();
