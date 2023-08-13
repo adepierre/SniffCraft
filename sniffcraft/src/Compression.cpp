@@ -5,7 +5,6 @@
 #include <cstring>
 #include <stdexcept>
 #include <fstream>
-#include <tuple>
 
 constexpr size_t MAX_COMPRESSED_PACKET_LEN = 200 * 1024;
 

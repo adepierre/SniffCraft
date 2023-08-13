@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstddef>
 #include <fstream>
+#include <tuple>
 
 
 std::vector<unsigned char> Compress(const std::vector<unsigned char> &data);
