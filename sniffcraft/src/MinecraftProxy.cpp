@@ -1,4 +1,5 @@
 #include <iostream>
+#include <filesystem>
 
 #include <protocolCraft/BinaryReadWrite.hpp>
 #include <protocolCraft/MessageFactory.hpp>
@@ -190,6 +191,31 @@ void MinecraftProxy::LoadConfig()
     {
         std::cerr << "Error, empty conf path" << std::endl;
         return;
+    }
+
+    if (!std::filesystem::exists(conf_path_))
+    {
+        Json::Value packet_lists = {
+            { "ignored_clientbound", Json::Array() },
+            { "ignored_serverbound", Json::Array() },
+            { "detailed_clientbound", Json::Array() },
+            { "detailed_serverbound", Json::Array() },
+        };
+        Json::Value default_conf = {
+            { "LogToFile", true },
+            { "LogToConsole", false },
+            { "LogToReplay", false },
+            { "LogRawBytes", false },
+            { "Online", false },
+            { "NetworkRecapToConsole", false },
+            { "MicrosoftAccountCacheKey", "" },
+            { "Handshaking", packet_lists },
+            { "Status", packet_lists },
+            { "Login", packet_lists },
+            { "Play", packet_lists }
+        };
+        std::ofstream outfile(conf_path_, std::ios::out);
+        outfile << default_conf.Dump(4);
     }
 
     std::ifstream file = std::ifstream(conf_path_, std::ios::in);

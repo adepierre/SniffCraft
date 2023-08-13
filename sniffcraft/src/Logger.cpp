@@ -244,7 +244,6 @@ void Logger::LoadConfig(const std::string& path)
         file.close();
     }
 
-    //Create default conf
     if (error)
     {
         return;

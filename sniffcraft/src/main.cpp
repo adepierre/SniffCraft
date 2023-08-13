@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
 
    const short client_port = static_cast<short>(std::atoi(argv[1]));
    const std::string server_address = argv[2];
-   std::string logconf_path = "";
+   std::string logconf_path = "conf.json";
 
    if (argc == 4)
    {
