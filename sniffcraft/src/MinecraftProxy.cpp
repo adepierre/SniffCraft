@@ -40,6 +40,9 @@ void MinecraftProxy::Start(const std::string& server_address, const unsigned sho
     logger = std::make_unique<Logger>(conf_path_);
     replay_logger = nullptr;
 
+    server_ip_ = server_address;
+    server_port_ = server_port;
+
     LoadConfig();
 
     BaseProxy::Start(server_address, server_port);
@@ -209,6 +212,7 @@ void MinecraftProxy::LoadConfig()
     if (json.contains("LogToReplay") && json["LogToReplay"].get<bool>())
     {
         replay_logger = std::make_unique<ReplayModLogger>(conf_path_);
+        replay_logger->SetServerName(server_ip_ + ":" + std::to_string(server_port_));
     }
 
 #ifdef USE_ENCRYPTION
@@ -246,6 +250,7 @@ void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
     std::string new_hostname = server_ip_;
     const size_t old_hostname_strlen = strlen(msg.GetHostName().c_str());
     // Forge adds \0FML\0, \0FML2\0 or \0FML3\0 to the hostname
+    // strlen will only count the size until the fist \0
     if (msg.GetHostName().size() > old_hostname_strlen)
     {
         new_hostname += msg.GetHostName().substr(old_hostname_strlen);

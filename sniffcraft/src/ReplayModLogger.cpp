@@ -177,7 +177,7 @@ void ReplayModLogger::SaveReplayMetadataFile() const
 void ReplayModLogger::WrapMCPRFile() const
 {
     ZeptoZip::CreateZipArchive(session_prefix + ".mcpr", { session_prefix + "_metaData.json", session_prefix + "_recording.tmcpr" },
-        { "metaData.json", "recording.tmcpr" }, { true, true });
+        { "metaData.json", "recording.tmcpr" });
     std::remove((session_prefix + "_metaData.json").c_str());
     std::remove((session_prefix + "_recording.tmcpr").c_str());
 }

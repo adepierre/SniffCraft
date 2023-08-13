@@ -14,20 +14,19 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/NetworkRecapItem.hpp
     include/sniffcraft/ReplayModLogger.hpp
     include/sniffcraft/server.hpp
-    
+
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSMessage.hpp
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSQuestion.hpp
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSResourceRecord.hpp
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/DNS/DNSSrvData.hpp
-    
+
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/Authentifier.hpp
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Network/AESEncrypter.hpp
     ../3rdparty/botcraft/botcraft/include/botcraft/Network/LastSeenMessagesTracker.hpp
-    
+
     ../3rdparty/botcraft/botcraft/include/botcraft/Utilities/Logger.hpp
     ../3rdparty/botcraft/botcraft/private_include/botcraft/Utilities/StringUtilities.hpp
-    
-    include/sniffcraft/Zip/CRC32.hpp
+
     include/sniffcraft/Zip/DosTime.hpp
     include/sniffcraft/Zip/ZeptoZip.hpp
 )
@@ -43,9 +42,9 @@ set(sniffcraft_SRC
     src/ReplayModLogger.cpp
     src/server.cpp
     src/main.cpp
-    
+
     src/Zip/ZeptoZip.cpp
-    
+
     ../3rdparty/botcraft/botcraft/src/Network/Authentifier.cpp
     ../3rdparty/botcraft/botcraft/src/Network/AESEncrypter.cpp
     ../3rdparty/botcraft/botcraft/src/Network/LastSeenMessagesTracker.cpp
@@ -123,4 +122,3 @@ target_link_libraries(sniffcraft PUBLIC Threads::Threads)
 
 # Add protocolCraft
 target_link_libraries(sniffcraft PUBLIC protocolCraft)
-
