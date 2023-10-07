@@ -11,41 +11,55 @@
             
         ],
         "ignored_serverbound" : [
-            
+
         ],
         "detailed_clientbound": [
-            
+
         ],
         "detailed_serverbound": [
-            
+
         ]
     },
     "Status": {
         "ignored_clientbound" : [
-            
+
         ],
         "ignored_serverbound" : [
-            
+
         ],
         "detailed_clientbound": [
-            
+
         ],
         "detailed_serverbound": [
-            
+
+        ]
+    },
+    "Configuration": {
+        "ignored_clientbound" : [
+
+        ],
+        "ignored_serverbound" : [
+
+        ],
+        "detailed_clientbound": [
+
+        ],
+        "detailed_serverbound": [
+
         ]
     },
     "Login": {
         "ignored_clientbound" : [
-            
+
         ],
         "ignored_serverbound" : [
-            
+
         ],
         "detailed_clientbound": [
-            
+
         ],
         "detailed_serverbound": [
-            
+
         ]
     },
     "Play": {
@@ -83,10 +97,10 @@
             "Keep Alive"
         ],
         "detailed_clientbound": [
-            
+
         ],
         "detailed_serverbound": [
-            
+
         ]
     }
 }

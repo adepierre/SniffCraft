@@ -253,7 +253,10 @@ void Logger::LoadConfig(const std::string& path)
         {"Handshaking", ConnectionState::Handshake},
         {"Status", ConnectionState::Status},
         {"Login", ConnectionState::Login},
-        {"Play", ConnectionState::Play}
+        {"Play", ConnectionState::Play},
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+        {"Configuration", ConnectionState::Configuration},
+#endif
     };
 
     log_to_file = true;

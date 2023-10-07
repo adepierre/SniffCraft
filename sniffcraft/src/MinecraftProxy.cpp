@@ -336,10 +336,12 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
 #endif
 }
 
+#if PROTOCOL_VERSION < 764 /* < 1.20.2 */
 void MinecraftProxy::Handle(ClientboundGameProfilePacket& msg)
 {
     connection_state = ConnectionState::Play;
 }
+#endif
 
 void MinecraftProxy::Handle(ClientboundLoginCompressionPacket& msg)
 {
@@ -541,5 +543,22 @@ void MinecraftProxy::Handle(ClientboundPlayerChatPacket& msg)
             logger->Log(ack_msg, connection_state, Endpoint::SniffcraftToServer, 0);
         }
     }
+}
+#endif
+
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+void MinecraftProxy::Handle(ServerboundLoginAcknowledgedPacket& msg)
+{
+    connection_state = ConnectionState::Configuration;
+}
+
+void MinecraftProxy::Handle(ServerboundFinishConfigurationPacket& msg)
+{
+    connection_state = ConnectionState::Play;
+}
+
+void MinecraftProxy::Handle(ServerboundConfigurationAcknowledgedPacket& msg)
+{
+    connection_state = ConnectionState::Configuration;
 }
 #endif

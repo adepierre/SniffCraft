@@ -1,6 +1,7 @@
 #pragma once
 
 #include <protocolCraft/Handler.hpp>
+#include <protocolCraft/enums.hpp>
 
 #include "sniffcraft/BaseProxy.hpp"
 
@@ -45,7 +46,9 @@ private:
     virtual void Handle(ProtocolCraft::Message& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundHelloPacket& msg) override;
+#if PROTOCOL_VERSION < 764 /* < 1.20.2 */
     virtual void Handle(ProtocolCraft::ClientboundGameProfilePacket& msg) override;
+#endif
     virtual void Handle(ProtocolCraft::ClientboundLoginCompressionPacket& msg) override;
     virtual void Handle(ProtocolCraft::ClientboundHelloPacket& msg) override;
 #if USE_ENCRYPTION && PROTOCOL_VERSION > 760 /* > 1.19.1/2 */
@@ -53,6 +56,11 @@ private:
     virtual void Handle(ProtocolCraft::ServerboundChatPacket& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundChatCommandPacket& msg) override;
     virtual void Handle(ProtocolCraft::ClientboundPlayerChatPacket& msg) override;
+#endif
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+    virtual void Handle(ProtocolCraft::ServerboundLoginAcknowledgedPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundFinishConfigurationPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundConfigurationAcknowledgedPacket& msg) override;
 #endif
 
 private:
