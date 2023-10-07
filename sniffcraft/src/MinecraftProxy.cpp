@@ -8,7 +8,7 @@
 #ifdef USE_ENCRYPTION
 #include <botcraft/Network/AESEncrypter.hpp>
 #include <botcraft/Network/Authentifier.hpp>
-#if PROTOCOL_VERSION > 758
+#if PROTOCOL_VERSION > 758 /* > 1.18.2 */
 #include <botcraft/Utilities/StringUtilities.hpp>
 #endif
 #endif
@@ -305,12 +305,12 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
     // Make sure we use the name and the signature key
     // of the profile we auth with
     std::shared_ptr<ServerboundHelloPacket> replacement_hello_packet = std::make_shared<ServerboundHelloPacket>();
-#if PROTOCOL_VERSION < 759
+#if PROTOCOL_VERSION < 759 /* < 1.19 */
     replacement_hello_packet->SetGameProfile(authentifier->GetPlayerDisplayName());
 #else
     replacement_hello_packet->SetName(authentifier->GetPlayerDisplayName());
 
-#if PROTOCOL_VERSION < 761
+#if PROTOCOL_VERSION < 761 /* < 1.19.3 */
     ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
     const std::vector<unsigned char> key_bytes = Botcraft::Utilities::RSAToBytes(authentifier->GetPublicKey());
@@ -323,7 +323,7 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
     key.SetSignature(Botcraft::Utilities::DecodeBase64(authentifier->GetKeySignature()));
     replacement_hello_packet->SetPublicKey(key);
 #endif
-#if PROTOCOL_VERSION > 759
+#if PROTOCOL_VERSION > 759 /* > 1.19 */
     replacement_hello_packet->SetProfileId(authentifier->GetPlayerUUID());
 #endif
 #endif
@@ -365,11 +365,11 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
     std::vector<unsigned char> raw_shared_secret;
     std::vector<unsigned char> encrypted_shared_secret;
 
-#if PROTOCOL_VERSION < 759
+#if PROTOCOL_VERSION < 759 /* < 1.19 */
     std::vector<unsigned char> encrypted_nonce;
     encrypter->Init(msg.GetPublicKey(), msg.GetNonce(),
         raw_shared_secret, encrypted_nonce, encrypted_shared_secret);
-#elif PROTOCOL_VERSION < 761
+#elif PROTOCOL_VERSION < 761 /* < 1.19.3 */
     std::vector<unsigned char> salted_nonce_signature;
     long long int salt;
     encrypter->Init(msg.GetPublicKey(), msg.GetNonce(), authentifier->GetPrivateKey(),
@@ -385,10 +385,10 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
 
     std::shared_ptr<ServerboundKeyPacket> response_msg = std::make_shared<ServerboundKeyPacket>();
     response_msg->SetKeyBytes(encrypted_shared_secret);
-#if PROTOCOL_VERSION < 759
+#if PROTOCOL_VERSION < 759 /* < 1.19 */
     // Pre-1.19 behaviour, send encrypted nonce
     response_msg->SetNonce(encrypted_nonce);
-#elif PROTOCOL_VERSION < 761
+#elif PROTOCOL_VERSION < 761 /* < 1.19.3 */
     // 1.19 - 1.19.2 behaviour, send salted nonce signature
     SaltSignature salt_signature;
     salt_signature.SetSalt(salt);
@@ -417,7 +417,7 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
 #endif
 }
 
-#if USE_ENCRYPTION && PROTOCOL_VERSION > 760
+#if USE_ENCRYPTION && PROTOCOL_VERSION > 760 /* > 1.19.1/2 */
 void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
 {
     if (authentifier == nullptr)
