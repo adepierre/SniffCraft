@@ -1,0 +1,97 @@
+name: Automatic Release
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+
+jobs:
+  build_os_matrix:
+    name: ${{ matrix.config.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: Windows,
+              os: windows-latest
+            }
+          - {
+              name: Linux,
+              os: ubuntu-latest
+            }
+    uses: ./.github/workflows/sniffcraft_build.yml
+    with:
+      os: ${{ matrix.config.os }}
+
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build_os_matrix
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sniffcraft-Linux
+          path: linux
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sniffcraft-Windows
+          path: windows
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: MC-version
+          path: version
+
+      - name: Retrieve MC game version
+        id: mc-version
+        run: echo "version=$(cat version/version.txt)" >> $
+
+      - name: Create release note
+        run: |
+            echo Automatically generated binaries with the latest version of the code for Minecraft ${{ steps.mc-version.outputs.content }}. > release_note.txt
+            echo -en '\n' >> release_note.txt
+            echo "Examples of conf files can be found [here](https://github.com/${{ github.repository }}/tree/master/conf)." >> release_note.txt
+            echo -en '\n' >> release_note.txt
+            echo "💡 If you need binaries for a previous version of Minecraft, you can open [an issue using this link](https://github.com/${{ github.repository }}/issues/new?assignees=&labels=version+request&template=version-request.yml&title=%5BVersion+request%5D) and it will be automagically generated for you in a few minutes." >> release_note.txt
+            echo -en '\n' >> release_note.txt
+            echo **Changes:** >> release_note.txt
+
+      - name: Append git commits
+        run: git log latest..HEAD --oneline --no-merges >> release_note.txtGITHUB_OUTPUT
+
+      - name: Rename artifacts
+        run: |
+          mv linux/sniffcraft sniffcraft-linux-${{ steps.mc-version.outputs.version }}
+          mv windows/sniffcraft.exe sniffcraft-windows-${{ steps.mc-version.outputs.version }}.exe
+
+      - name: Remove old latest release
+        run: gh release delete latest --repo ${{ github.repository }} --cleanup-tag -y
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create new latest release
+        run: >
+          gh release create latest
+          sniffcraft-linux-${{ steps.mc-version.outputs.version }}
+          sniffcraft-windows-${{ steps.mc-version.outputs.version }}.exe
+          --repo ${{ github.repository }}
+          --latest
+          -F release_note.txt
+          -t Latest
+        env:
+          GH_TOKEN: ${{ github.token }}

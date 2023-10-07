@@ -1,0 +1,81 @@
+name: Sniffcraft Build
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: OS we want to build for
+        required: true
+        type: string
+      version:
+        description: Minecraft Version
+        required: false
+        default: latest
+        type: string
+      issue:
+        description: URL of the issue requesting this build
+        required: false
+        default: ""
+        type: string
+
+env:
+  BUILD_TYPE: Release
+  CMAKE_GENERATOR: ${{ inputs.os == 'windows-latest' && 'Visual Studio 17 2022' || 'Unix Makefiles' }}
+
+jobs:
+  build:
+    runs-on: ${{ inputs.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Create build folder
+        run: cmake -E make_directory ${{ runner.workspace }}/build
+
+      - name: Configure cmake
+        shell: bash
+        working-directory: ${{ runner.workspace }}/build
+        run: >
+          cmake -G "$CMAKE_GENERATOR"
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+          -DGAME_VERSION=${{ inputs.version }}
+          -DSNIFFCRAFT_WITH_ENCRYPTION=ON
+          -DSNIFFCRAFT_FORCE_LOCAL_ZLIB=ON
+          -DSNIFFCRAFT_FORCE_LOCAL_OPENSSL=ON
+          -S $GITHUB_WORKSPACE
+          -B .
+
+      - name: Upload version artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v3
+        with:
+          name: MC-version
+          path: ${{ runner.workspace }}/build/version.txt
+          retention-days: 1
+
+      - name: Build all
+        shell: bash
+        id: build
+        working-directory: ${{ runner.workspace }}/build
+        run: cmake --build . --config $BUILD_TYPE --parallel 2
+
+      - name: Notify issue if build failed
+        if: failure() && steps.build.conclusion == 'failure' && inputs.issue
+        shell: bash
+        run: |
+          echo "${{ runner.os }} build failed. Logs can be found [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." > body.txt
+          echo -en '\n' >> body.txt
+          echo -en '\n' >> body.txt
+          echo @${{ github.repository_owner }} you might want to take a look. >> body.txt
+          gh issue comment ${{ inputs.issue }} --repo ${{ github.repository }} --body-file body.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: sniffcraft-${{ runner.os }}
+          path: ${{ github.workspace }}/bin/sniffcraft*
+          retention-days: 1

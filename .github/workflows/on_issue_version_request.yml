@@ -5,8 +5,12 @@ on:
     types: [opened, reopened]
 
 jobs:
-  compile_if_requested:
+  check_if_build_needed:
     runs-on: ubuntu-latest
+    outputs:
+      is_valid_request: ${{ steps.check.outputs.is_valid_request }}
+      version: ${{ steps.retrieve.outputs.version }}
+      value: ${{ steps.exist.outputs.value }}
     steps:
       - id: check
         name: Check if issue is a request
@@ -24,22 +28,95 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - id: trigger
-        name: Trigger manual build
-        if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.exist.outputs.value == 0 }}
-        run: |
-          gh workflow run manual_build.yml --repo ${{ github.repository }} -f minecraft_version=${{ steps.retrieve.outputs.version }} -f issue=${{ github.event.issue.html_url }}
-          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. You can follow the build progress [here](https://github.com/${{ github.repository }}/actions) or subscribe to this issue to be notified when binaries are ready."
+
+  os_matrix:
+    needs: check_if_build_needed
+    name: ${{ matrix.config.name }}
+    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value == 0 }}
+    secrets: inherit
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: Windows,
+              os: windows-latest
+            }
+          - {
+              name: Linux,
+              os: ubuntu-latest
+            }
+    uses: ./.github/workflows/sniffcraft_build.yml
+    with:
+      os: ${{ matrix.config.os }}
+      version: ${{ needs.check_if_build_needed.outputs.version }}
+      issue: ${{ github.event.issue.html_url }}
+
+
+  notify_build_started:
+    runs-on: ubuntu-latest
+    needs: check_if_build_needed
+    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value == 0 }}
+    steps:
+      - name: Notify issue
+        run: gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. You can follow the build progress [here](https://github.com/${{ github.repository }}/actions) or subscribe to this issue to be notified when binaries are ready."
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - id: redirect_to_release
-        name: Redirect to already existing binaries
-        if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.exist.outputs.value != 0 }}
+
+  notify_already_exists:
+    runs-on: ubuntu-latest
+    needs: check_if_build_needed
+    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value != 0 }}
+    steps:
+      - name: Notify issue
         run: |
-          echo "Binaries for ${{ steps.retrieve.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." > body.txt
+          echo "Binaries for ${{ needs.check_if_build_needed.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." > body.txt
           echo -en '\n' >> body.txt
-          echo You can close this issue. Feel free to reopen at anytime if you need an updated build for the same version. >> body.txt
+          echo You can close this issue. If you need an updated build for the same Minecraft version in the future, you can reopen this issue to trigger a new build instead of creating a new one. >> body.txt
+          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} --body-file body.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+
+  update_release:
+    runs-on: ubuntu-latest
+    needs:
+      - check_if_build_needed
+      - os_matrix
+      - notify_build_started
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sniffcraft-Linux
+          path: linux
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sniffcraft-Windows
+          path: windows
+
+      - name: Rename artifacts
+        run: |
+          mv linux/sniffcraft sniffcraft-linux-${{ needs.check_if_build_needed.outputs.version }}
+          mv windows/sniffcraft.exe sniffcraft-windows-${{ needs.check_if_build_needed.outputs.version }}.exe
+
+      - name: Upload files to release
+        run: >
+          gh release upload latest
+          sniffcraft-linux-${{ needs.check_if_build_needed.outputs.version }}
+          sniffcraft-windows-${{ needs.check_if_build_needed.outputs.version }}.exe
+          --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Comment on associated issue
+        run: |
+          echo "New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ needs.check_if_build_needed.outputs.version }}" > body.txt
+          echo -en '\n' >> body.txt
+          echo You can now close this issue. If you need an updated build for the same Minecraft version in the future, you can reopen this issue to trigger a new build instead of creating a new issue. >> body.txt
           gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} --body-file body.txt
         env:
           GH_TOKEN: ${{ github.token }}
