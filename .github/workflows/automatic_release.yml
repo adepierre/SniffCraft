@@ -59,7 +59,7 @@ jobs:
 
       - name: Retrieve MC game version
         id: mc-version
-        run: echo "version=$(cat version/version.txt)" >> $
+        run: echo "version=$(cat version/version.txt)" >> $GITHUB_OUTPUT
 
       - name: Create release note
         run: |
