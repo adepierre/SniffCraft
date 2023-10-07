@@ -72,7 +72,7 @@ jobs:
             echo **Changes:** >> release_note.txt
 
       - name: Append git commits
-        run: git log latest..HEAD --oneline --no-merges >> release_note.txtGITHUB_OUTPUT
+        run: git log latest..HEAD --oneline --no-merges >> release_note.txt
 
       - name: Rename artifacts
         run: |
