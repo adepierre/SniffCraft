@@ -25,6 +25,10 @@ jobs:
               name: Linux,
               os: ubuntu-latest
             }
+          - {
+              name: macOS,
+              os: macos-latest
+            }
     uses: ./.github/workflows/sniffcraft_build.yml
     with:
       os: ${{ matrix.config.os }}
@@ -50,6 +54,12 @@ jobs:
         with:
           name: sniffcraft-Windows
           path: windows
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sniffcraft-macOS
+          path: macos
 
       - name: Download version artifact
         uses: actions/download-artifact@v3
@@ -78,6 +88,7 @@ jobs:
         run: |
           mv linux/sniffcraft sniffcraft-linux-${{ steps.mc-version.outputs.version }}
           mv windows/sniffcraft.exe sniffcraft-windows-${{ steps.mc-version.outputs.version }}.exe
+          mv macos/sniffcraft sniffcraft-macos-${{ steps.mc-version.outputs.version }}
 
       - name: Remove old latest release
         run: gh release delete latest --repo ${{ github.repository }} --cleanup-tag -y
@@ -89,6 +100,7 @@ jobs:
           gh release create latest
           sniffcraft-linux-${{ steps.mc-version.outputs.version }}
           sniffcraft-windows-${{ steps.mc-version.outputs.version }}.exe
+          sniffcraft-macos-${{ steps.mc-version.outputs.version }}
           --repo ${{ github.repository }}
           --latest
           -F release_note.txt
