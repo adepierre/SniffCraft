@@ -46,6 +46,10 @@ jobs:
               name: Linux,
               os: ubuntu-latest
             }
+          - {
+              name: MacOS,
+              os: macos-latest
+            }
     uses: ./.github/workflows/sniffcraft_build.yml
     with:
       os: ${{ matrix.config.os }}
@@ -98,16 +102,24 @@ jobs:
           name: sniffcraft-Windows
           path: windows
 
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: sniffcraft-macOS
+          path: macos
+
       - name: Rename artifacts
         run: |
           mv linux/sniffcraft sniffcraft-linux-${{ needs.check_if_build_needed.outputs.version }}
           mv windows/sniffcraft.exe sniffcraft-windows-${{ needs.check_if_build_needed.outputs.version }}.exe
+          mv macos/sniffcraft sniffcraft-macos-${{ needs.check_if_build_needed.outputs.version }}
 
       - name: Upload files to release
         run: >
           gh release upload latest
           sniffcraft-linux-${{ needs.check_if_build_needed.outputs.version }}
           sniffcraft-windows-${{ needs.check_if_build_needed.outputs.version }}.exe
+          sniffcraft-macos-${{ needs.check_if_build_needed.outputs.version }}
           --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
