@@ -122,7 +122,7 @@ cmake --build . --config Release
 
 If you need more help, you can join the Sniffcraft/Botcraft community [discord server](https://discord.gg/wECVsTbjA9).
 
-Once built, you can start SniffCraft with the following command line:
+Once built, you can start SniffCraft with the following command line (by default output executable file can be found in ``bin`` folder next to the source code:
 
 ```
 sniffcraft listening_port server_address conf_filepath
