@@ -1,3 +1,4 @@
+#include "sniffcraft/FileUtilities.hpp"
 #include "sniffcraft/Logger.hpp"
 
 #include <iostream>
@@ -7,12 +8,15 @@
 
 #include <protocolCraft/MessageFactory.hpp>
 #include <protocolCraft/Handler.hpp>
-#include <sniffcraft/FileUtilities.hpp>
 
 using namespace ProtocolCraft;
 
 Logger::Logger(const std::string &conf_path)
 {
+    last_time_checked_conf_file = 0;
+    last_time_conf_file_modified = 0;
+    last_time_network_recap_printed = 0;
+
     logconf_path = conf_path;
     LoadConfig(logconf_path);
 
