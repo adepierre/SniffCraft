@@ -13,6 +13,8 @@ using namespace ProtocolCraft;
 
 Logger::Logger(const std::string &conf_path)
 {
+    start_time = std::chrono::system_clock::now();
+
     last_time_checked_conf_file = 0;
     last_time_conf_file_modified = 0;
     last_time_network_recap_printed = 0;
@@ -51,7 +53,6 @@ void Logger::Log(const std::shared_ptr<Message>& msg, const ConnectionState conn
     std::lock_guard<std::mutex> log_guard(log_mutex);
     if (log_to_file && !log_file.is_open())
     {
-        start_time = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
 
         std::stringstream ss;
