@@ -96,16 +96,17 @@ void Logger::LogConsume()
             if (item.msg == nullptr)
             {
                 output
-                    << "["
+                    << '['
                     << hours
-                    << ":"
+                    << ':'
                     << std::setw(2) << std::setfill('0') << min
-                    << ":"
+                    << ':'
                     << std::setw(2) << std::setfill('0') << sec
-                    << ":"
+                    << ':'
                     << std::setw(3) << std::setfill('0') << millisec
                     << "] "
-                    << OriginToString(item.origin) << " ";
+                    << ConnectionStateToString(item.connection_state) << ' '
+                    << OriginToString(item.origin) << ' ';
                 output << "UNKNOWN OR WRONGLY PARSED MESSAGE";
                 const std::string output_str = output.str();
                 if (log_to_file)
@@ -119,26 +120,15 @@ void Logger::LogConsume()
                 continue;
             }
 
+            const std::string packet_name = GetPacketName(item);
+
             // Update network recap data
-            if (item.connection_state == ConnectionState::Play && item.bandwidth_bytes > 0)
+            if (item.bandwidth_bytes > 0)
             {
                 const Endpoint simple_origin = SimpleOrigin(item.origin);
                 std::map<std::string, NetworkRecapItem>& recap_data_map = simple_origin == Endpoint::Server ? clientbound_network_recap_data : serverbound_network_recap_data;
 
-                // Get Network recap key (packet name + identifier if custom payload)
-                std::string map_key(item.msg->GetName());
-                if (simple_origin == Endpoint::Server && item.msg->GetId() == ProtocolCraft::ClientboundCustomPayloadPacket::packet_id)
-                {
-                    std::shared_ptr<ProtocolCraft::ClientboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ProtocolCraft::ClientboundCustomPayloadPacket>(item.msg);
-                    map_key += "|" + custom_payload->GetIdentifier();
-                }
-                else if (simple_origin == Endpoint::Client && item.msg->GetId() == ProtocolCraft::ServerboundCustomPayloadPacket::packet_id)
-                {
-                    std::shared_ptr<ProtocolCraft::ServerboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ProtocolCraft::ServerboundCustomPayloadPacket>(item.msg);
-                    map_key += "|" + custom_payload->GetIdentifier();
-                }
-
-                NetworkRecapItem& recap = recap_data_map[map_key];
+                NetworkRecapItem& recap = recap_data_map[packet_name];
                 recap.count += 1;
                 recap.bandwidth_bytes += item.bandwidth_bytes;
 
@@ -158,17 +148,18 @@ void Logger::LogConsume()
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
 
             output
-                << "["
+                << '['
                 << hours
-                << ":"
+                << ':'
                 << std::setw(2) << std::setfill('0') << min
-                << ":"
+                << ':'
                 << std::setw(2) << std::setfill('0') << sec
-                << ":"
+                << ':'
                 << std::setw(3) << std::setfill('0') << millisec
                 << "] "
-                << OriginToString(item.origin) << " ";
-            output << item.msg->GetName();
+                << ConnectionStateToString(item.connection_state) << ' '
+                << OriginToString(item.origin) << ' ';
+            output << packet_name;
             if (log_raw_bytes)
             {
                 output << '\n';
@@ -342,7 +333,7 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
                 for (int j = 0; j < 150; ++j)
                 {
                     const std::shared_ptr<Message> msg = CreateClientboundMessage(connection_state, j);
-                    if (msg && msg->GetName() == val.get<std::string>())
+                    if (msg != nullptr && msg->GetName() == val.get<std::string>())
                     {
                         ignored_packets[{connection_state, Endpoint::Server}].insert(j);
                         break;
@@ -425,7 +416,7 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
     }
 }
 
-std::string Logger::OriginToString(const Endpoint origin) const
+std::string_view Logger::OriginToString(const Endpoint origin) const
 {
     switch (origin)
     {
@@ -444,6 +435,72 @@ std::string Logger::OriginToString(const Endpoint origin) const
     default:
         return "";
     }
+}
+
+std::string_view Logger::ConnectionStateToString(const ConnectionState connection_state) const
+{
+    switch (connection_state)
+    {
+    case ConnectionState::None:
+        return "[None]";
+    case ConnectionState::Handshake:
+        return "[Handshake]";
+    case ConnectionState::Login:
+        return "[Login]";
+    case ConnectionState::Status:
+        return "[Status]";
+    case ConnectionState::Play:
+        return "[Play]";
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+    case ConnectionState::Configuration:
+        return "[Configuration]";
+#endif
+    }
+}
+
+std::string Logger::GetPacketName(const LogItem& item) const
+{
+    const Endpoint simple_origin = SimpleOrigin(item.origin);
+    const std::string packet_name(item.msg->GetName());
+    switch (item.connection_state)
+    {
+    case ConnectionState::Play:
+        if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomPayloadPacket::packet_id)
+        {
+            std::shared_ptr<ClientboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadPacket>(item.msg);
+            return packet_name + '|' + custom_payload->GetIdentifier();
+        }
+        else if (simple_origin == Endpoint::Client && item.msg->GetId() == ServerboundCustomPayloadPacket::packet_id)
+        {
+            std::shared_ptr<ServerboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadPacket>(item.msg);
+            return packet_name + '|' + custom_payload->GetIdentifier();
+        }
+        break;
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+    case ConnectionState::Configuration:
+        if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomPayloadConfigurationPacket::packet_id)
+        {
+            std::shared_ptr<ClientboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadConfigurationPacket>(item.msg);
+            return packet_name + '|' + custom_payload->GetIdentifier();
+        }
+        else if (simple_origin == Endpoint::Client && item.msg->GetId() == ServerboundCustomPayloadConfigurationPacket::packet_id)
+        {
+            std::shared_ptr<ServerboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadConfigurationPacket>(item.msg);
+            return packet_name + '|' + custom_payload->GetIdentifier();
+        }
+        break;
+#endif
+    case ConnectionState::Login:
+        if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomQueryPacket::packet_id)
+        {
+            std::shared_ptr<ClientboundCustomQueryPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomQueryPacket>(item.msg);
+            return packet_name + '|' + custom_payload->GetIdentifier().GetFull();
+        }
+        break;
+    default:
+        break;
+    }
+    return packet_name;
 }
 
 Endpoint Logger::SimpleOrigin(const Endpoint origin) const

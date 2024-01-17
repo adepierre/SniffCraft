@@ -8,15 +8,16 @@
 #include <protocolCraft/Message.hpp>
 #include <protocolCraft/Utilities/Json.hpp>
 
-#include <thread>
-#include <mutex>
+#include <chrono>
+#include <condition_variable>
+#include <ctime>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <queue>
-#include <chrono>
 #include <set>
-#include <ctime>
-#include <condition_variable>
+#include <string_view>
+#include <thread>
 
 class Logger
 {
@@ -29,7 +30,12 @@ private:
     void LogConsume();
     void LoadConfig(const std::string& path);
     void LoadPacketsFromJson(const ProtocolCraft::Json::Value& value, const ProtocolCraft::ConnectionState connection_state);
-    std::string OriginToString(const Endpoint origin) const;
+    std::string_view OriginToString(const Endpoint origin) const;
+    std::string_view ConnectionStateToString(const ProtocolCraft::ConnectionState connection_state) const;
+    /// @brief Get packet name (default packet name + identifier if it's a custom payload)
+    /// @param item LogItem
+    /// @return Displayable packet name
+    std::string GetPacketName(const LogItem& item) const;
     Endpoint SimpleOrigin(const Endpoint origin) const;
     std::string GenerateNetworkRecap(const int max_entry = -1, const int max_name_size = -1) const;
 
