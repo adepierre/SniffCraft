@@ -5,10 +5,6 @@
 #include <iomanip>
 #include <iostream>
 
-#include <protocolCraft/MessageFactory.hpp>
-#include <protocolCraft/Handler.hpp>
-#include <sniffcraft/FileUtilities.hpp>
-
 using namespace ProtocolCraft;
 
 ReplayModLogger::ReplayModLogger(const std::string &conf_path)
@@ -84,18 +80,9 @@ void ReplayModLogger::LogConsume()
                 logging_queue.pop();
             }
 
-            auto hours = std::chrono::duration_cast<std::chrono::hours>(item.date - start_time).count();
-            auto min = std::chrono::duration_cast<std::chrono::minutes>(item.date - start_time).count();
-            auto sec = std::chrono::duration_cast<std::chrono::seconds>(item.date - start_time).count();
-            auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count();
-            auto total_millisec = millisec;
-            millisec -= sec * 1000;
-            sec -= min * 60;
-            min -= hours * 60;
+            auto total_millisec = std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count();
 
-            if ((item.origin == Endpoint::Server || item.origin == Endpoint::SniffcraftToClient)
-                && (item.connection_state == ConnectionState::Play ||
-                    (item.connection_state == ConnectionState::Login && item.msg->GetId() == 0x02)))
+            if (item.origin == Endpoint::Server || item.origin == Endpoint::SniffcraftToClient)
             {
                 std::vector<unsigned char> packet;
                 // Write ID + Packet data
