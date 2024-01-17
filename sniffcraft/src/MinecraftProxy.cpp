@@ -125,10 +125,10 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
         // The packet is transmitted, log it as it is
         if (!error_parsing)
         {
-            logger->Log(msg, connection_state, source, packet_length + packet_length_length);
+            logger->Log(msg, old_connection_state, source, packet_length + packet_length_length);
             if (replay_logger)
             {
-                replay_logger->Log(msg, connection_state, source);
+                replay_logger->Log(msg, old_connection_state, source);
             }
         }
 
