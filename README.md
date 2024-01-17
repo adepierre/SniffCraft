@@ -34,11 +34,11 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 Here is an example of a captured session:
 ```javascript
-[0:00:48:050] [S --> C] Block Changed Ack
-[0:00:48:064] [C --> S] Swing
-[0:00:48:115] [C --> S] Swing
-[0:00:48:166] [C --> S] Swing
-[0:00:49:315] [C --> S] Use Item On
+[0:00:48:050] [Play] [S --> C] Block Changed Ack
+[0:00:48:064] [Play] [C --> S] Swing
+[0:00:48:115] [Play] [C --> S] Swing
+[0:00:48:166] [Play] [C --> S] Swing
+[0:00:49:315 [Play]] [C --> S] Use Item On
 {
     "cursor_position_x": 0.0,
     "cursor_position_y": 0.9097926616668701,
@@ -53,7 +53,7 @@ Here is an example of a captured session:
     },
     "sequence": 11
 }
-[0:00:49:348] [S --> C] Block Changed Ack
+[0:00:49:348] [Play] [S --> C] Block Changed Ack
 ```
 And an example of the summary you can find at the end of the session logfile:
 ```bash
