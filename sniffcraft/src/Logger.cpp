@@ -490,6 +490,7 @@ std::string Logger::GetPacketName(const LogItem& item) const
         }
         break;
 #endif
+#if PROTOCOL_VERSION > 340 /* > 1.12.2 */
     case ConnectionState::Login:
         if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomQueryPacket::packet_id)
         {
@@ -497,6 +498,7 @@ std::string Logger::GetPacketName(const LogItem& item) const
             return packet_name + '|' + custom_payload->GetIdentifier().GetFull();
         }
         break;
+#endif
     default:
         break;
     }
