@@ -38,7 +38,7 @@ Here is an example of a captured session:
 [0:00:48:064] [Play] [C --> S] Swing
 [0:00:48:115] [Play] [C --> S] Swing
 [0:00:48:166] [Play] [C --> S] Swing
-[0:00:49:315 [Play]] [C --> S] Use Item On
+[0:00:49:315] [Play] [C --> S] Use Item On
 {
     "cursor_position_x": 0.0,
     "cursor_position_y": 0.9097926616668701,
