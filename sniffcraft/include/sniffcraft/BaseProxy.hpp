@@ -22,7 +22,8 @@ public:
     /// @brief Starts the connection process to a given server
     /// @param server_address IP address of the server
     /// @param server_port port to connect to
-    virtual void Start(const std::string& server_address, const unsigned short server_port);
+    /// @param conf_path path to a configuration file
+    virtual void Start(const std::string& server_address, const unsigned short server_port, const std::string& conf_path);
 
     /// @brief Get the client connection underlying socket
     /// @return A reference to the client socket

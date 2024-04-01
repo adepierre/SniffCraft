@@ -1,13 +1,12 @@
-#include "sniffcraft/server.hpp"
 #include "sniffcraft/MinecraftProxy.hpp"
+#include "sniffcraft/server.hpp"
 
 #include <botcraft/Network/DNS/DNSMessage.hpp>
 #include <botcraft/Network/DNS/DNSSrvData.hpp>
 
-#include <botcraft/Network/AESEncrypter.hpp>
-#include <botcraft/Network/Authentifier.hpp>
-
+#include <filesystem>
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <utility>
 
@@ -23,72 +22,113 @@ const std::vector<std::string> SplitString(const std::string& s, const char deli
     return tokens;
 }
 
-Server::Server(asio::io_context& io_context, const unsigned short client_port,
-    const std::string& server_address, const std::string& conf_path_) :
-    io_context_(io_context),
-    acceptor_(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), client_port)),
-    conf_path(conf_path_),
-    client_port_(client_port)
+Server::Server(const std::string& conf_path)
 {
-    ResolveIpPortFromAddress(server_address);
+    this->conf_path = "conf.json";
+    if (conf_path.empty())
+    {
+        std::cerr << "Warning, no conf path specified, using default conf.json instead" << std::endl;
+    }
+    else
+    {
+        this->conf_path = conf_path;
+    }
+
+    const ProtocolCraft::Json::Value conf = LoadConf();
+
+    client_port = 8686;
+    if (!conf.contains("LocalPort") || !conf["LocalPort"].is_number())
+    {
+        std::cerr << "Warning, no valid LocalPort in conf file, using default 8686 instead" << std::endl;
+    }
+    else
+    {
+        client_port = conf["LocalPort"].get_number<unsigned short>();
+    }
+    acceptor = std::make_unique<asio::ip::tcp::acceptor>(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), client_port));
+
+    server_address = "127.0.0.1:25565";
+    if (!conf.contains("ServerAddress") || !conf["ServerAddress"].is_string())
+    {
+        std::cerr << "Warning, no valid ServerAddress in conf file, using default 127.0.0.1:25565 instead" << std::endl;
+    }
+    else
+    {
+        server_address = conf["ServerAddress"].get_string();
+    }
+    ResolveIpPortFromAddress();
+
     proxies_cleaning_thread = std::thread(&Server::CleanProxies, this);
-    start_accept();
 }
 
-void Server::start_accept()
+Server::~Server()
 {
-    BaseProxy* proxy = GetNewProxy();
+    if (running)
+    {
+        running = false;
+        proxies_cleaning_thread.join();
+    }
+}
 
-    acceptor_.async_accept(proxy->ClientSocket(),
+void Server::run()
+{
+    listen_connection();
+    std::cout << "Starting redirection of any connection on 127.0.0.1:" << client_port << " to " << server_ip << ":" << server_port << std::endl;
+    io_context.run();
+}
+
+void Server::listen_connection()
+{
+    BaseProxy* proxy = GetNewMinecraftProxy();
+
+    acceptor->async_accept(proxy->ClientSocket(),
         std::bind(&Server::handle_accept, this, proxy,
             std::placeholders::_1));
-
-    std::cout << "Ready to redirect any client connection on 127.0.0.1:" << client_port_ << " to " << server_ip_ << ":" << server_port_ << std::endl;
 }
 
 void Server::handle_accept(BaseProxy* new_proxy, const asio::error_code& ec)
 {
     if (!ec)
     {
-        new_proxy->Start(server_ip_, server_port_);
+        new_proxy->Start(server_ip, server_port, conf_path);
     }
     else
     {
         std::cerr << "Failed to start new proxy" << std::endl;
     }
-    start_accept();
+    listen_connection();
 }
 
-void Server::ResolveIpPortFromAddress(const std::string& address)
+void Server::ResolveIpPortFromAddress()
 {
     std::string addressOnly;
 
-    const std::vector<std::string> splitted_port = SplitString(address, ':');
+    const std::vector<std::string> splitted_port = SplitString(server_address, ':');
     // address:port format
     if (splitted_port.size() > 1)
     {
         try
         {
-            server_port_ = std::stoi(splitted_port[1]);
-            server_ip_ = splitted_port[0];
+            server_port = std::stoi(splitted_port[1]);
+            server_ip = splitted_port[0];
             return;
         }
         catch (const std::exception&)
         {
-            server_port_ = 0;
+            server_port = 0;
         }
         addressOnly = splitted_port[0];
     }
     // address only format
     else
     {
-        addressOnly = address;
-        server_port_ = 0;
+        addressOnly = server_address;
+        server_port = 0;
     }
 
     // If port is unknown we first try a SRV DNS lookup
     std::cout << "Performing SRV DNS lookup on " << "_minecraft._tcp." << addressOnly << " to find an endpoint" << std::endl;
-    asio::ip::udp::socket udp_socket(io_context_);
+    asio::ip::udp::socket udp_socket(io_context);
 
     // Create the query
     Botcraft::DNSMessage query;
@@ -110,7 +150,7 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
     // SRV type
     question.SetTypeCode(33);
     question.SetClassCode(1);
-    question.SetNameLabels(SplitString("_minecraft._tcp." + address, '.'));
+    question.SetNameLabels(SplitString("_minecraft._tcp." + server_address, '.'));
     query.SetQuestions({ question });
 
     // Write the request and send it to google DNS
@@ -140,12 +180,12 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
         auto iter2 = answer.GetAnswers()[0].GetRData().begin();
         size_t len2 = answer.GetAnswers()[0].GetRDLength();
         data.Read(iter2, len2);
-        server_ip_ = "";
+        server_ip = "";
         for (int i = 0; i < data.GetNameLabels().size(); ++i)
         {
-            server_ip_ += data.GetNameLabels()[i] + (i == data.GetNameLabels().size() - 1 ? "" : ".");
+            server_ip += data.GetNameLabels()[i] + (i == data.GetNameLabels().size() - 1 ? "" : ".");
         }
-        server_port_ = data.GetPort();
+        server_port = data.GetPort();
 
         std::cout << "SRV DNS lookup successful!" << std::endl;
         return;
@@ -154,28 +194,90 @@ void Server::ResolveIpPortFromAddress(const std::string& address)
 
     // If we are here either the port was given or the SRV failed 
     // In both cases we need to assume the given address is the correct one
-    server_port_ = (server_port_ == 0) ? 25565 : server_port_;
-    server_ip_ = addressOnly;
+    server_port = (server_port == 0) ? 25565 : server_port;
+    server_ip = addressOnly;
 }
 
-BaseProxy* Server::GetNewProxy()
+BaseProxy* Server::GetNewMinecraftProxy()
 {
     std::lock_guard<std::mutex> lock(proxies_mutex);
     // Create a new proxy
-    std::unique_ptr<BaseProxy> proxy = std::make_unique<MinecraftProxy>(io_context_, conf_path);
+    std::unique_ptr<BaseProxy> proxy = std::make_unique<MinecraftProxy>(io_context);
     proxies.push_back(std::move(proxy));
 
     return proxies.back().get();
 }
 
+ProtocolCraft::Json::Value Server::LoadConf() const
+{
+    if (!std::filesystem::exists(conf_path))
+    {
+        Json::Value packet_lists = {
+            { "ignored_clientbound", Json::Array() },
+            { "ignored_serverbound", Json::Array() },
+            { "detailed_clientbound", Json::Array() },
+            { "detailed_serverbound", Json::Array() },
+        };
+        Json::Value default_conf = {
+            { "ServerAddress", "127.0.0.1:25565" },
+            { "LocalPort", 8686 },
+            { "LogToTxtFile", true },
+            { "LogToConsole", false },
+            { "LogToReplay", false },
+            { "LogRawBytes", false },
+            { "Online", false },
+            { "Headless", false },
+            { "NetworkRecapToConsole", false },
+            { "MicrosoftAccountCacheKey", "" },
+            { "Handshaking", packet_lists },
+            { "Status", packet_lists },
+            { "Login", packet_lists },
+            { "Configuration", packet_lists },
+            { "Play", packet_lists }
+        };
+        std::ofstream outfile(conf_path, std::ios::out);
+        outfile << default_conf.Dump(4);
+    }
+
+    std::ifstream file = std::ifstream(conf_path, std::ios::in);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
+    }
+
+    Json::Value json;
+    file >> json;
+    file.close();
+
+    if (!json.is_object())
+    {
+        throw std::runtime_error("Error parsing conf file at: " + conf_path);
+    }
+
+    return json;
+}
+
+void Server::SaveConf(const ProtocolCraft::Json::Value& conf) const
+{
+    std::ofstream file = std::ofstream(conf_path, std::ios::out);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
+    }
+
+    file << conf.Dump(4);
+    file.close();
+}
+
 void Server::CleanProxies()
 {
-    while (true)
+    running = true;
+    while (running)
     {
         {
             std::lock_guard<std::mutex> lock(proxies_mutex);
             // Clean old proxies
-            for (int i = proxies.size() - 1; i > -1; --i)
+            for (int i = static_cast<int>(proxies.size()) - 1; i > -1; --i)
             {
                 if (proxies[i]->Started() && !proxies[i]->Running())
                 {

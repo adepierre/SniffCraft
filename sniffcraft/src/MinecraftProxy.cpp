@@ -23,12 +23,11 @@
 
 using namespace ProtocolCraft;
 
-MinecraftProxy::MinecraftProxy(asio::io_context& io_context, const std::string& conf_path) :
+MinecraftProxy::MinecraftProxy(asio::io_context& io_context) :
     BaseProxy(io_context)
 {
     connection_state = ConnectionState::Handshake;
     compression_threshold = -1;
-    conf_path_ = conf_path;
 }
 
 MinecraftProxy::~MinecraftProxy()
@@ -36,17 +35,54 @@ MinecraftProxy::~MinecraftProxy()
 
 }
 
-void MinecraftProxy::Start(const std::string& server_address, const unsigned short server_port)
+void MinecraftProxy::Start(const std::string& server_address, const unsigned short server_port, const std::string& conf_path)
 {
-    logger = std::make_unique<Logger>(conf_path_);
-    replay_logger = nullptr;
+    if (conf_path.empty() || !std::filesystem::exists(conf_path))
+    {
+        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
+    }
 
-    server_ip_ = server_address;
-    server_port_ = server_port;
+    std::ifstream file = std::ifstream(conf_path, std::ios::in);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
+    }
 
-    LoadConfig();
+    Json::Value conf;
+    file >> conf;
+    file.close();
 
-    BaseProxy::Start(server_address, server_port);
+    if (!conf.is_object())
+    {
+        std::cerr << "Error parsing conf file at " << conf_path << "." << std::endl;
+        return;
+    }
+
+    logger = std::make_unique<Logger>(conf_path);
+
+    if (conf.contains("LogToReplay") && conf["LogToReplay"].get<bool>())
+    {
+        replay_logger = std::make_unique<ReplayModLogger>(conf_path);
+        replay_logger->SetServerName(server_address + ":" + std::to_string(server_port));
+    }
+
+#ifdef USE_ENCRYPTION
+    if (conf.contains("Online") && conf["Online"].get<bool>())
+    {
+        authentifier = std::make_unique<Botcraft::Authentifier>();
+
+        const std::string credentials_cache_key = conf.contains("MicrosoftAccountCacheKey") ? conf["MicrosoftAccountCacheKey"].get<std::string>() : "";
+
+        std::cout << "Trying to authenticate using Microsoft account" << std::endl;
+        if (!authentifier->AuthMicrosoft(credentials_cache_key))
+        {
+            std::cerr << "Error trying to authenticate with Microsoft account" << std::endl;
+            throw std::runtime_error("Error trying to authenticate with Microsoft account");
+        }
+    }
+#endif
+
+    BaseProxy::Start(server_address, server_port, conf_path);
 }
 
 size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_iterator& data, const size_t length, const Endpoint source)
@@ -183,79 +219,6 @@ std::vector<unsigned char> MinecraftProxy::PacketToBytes(const Message& msg) con
     WriteData<VarInt>(static_cast<int>(content.size()), sized_packet);
     sized_packet.insert(std::end(sized_packet), std::cbegin(content), std::cend(content));
     return sized_packet;
-}
-
-void MinecraftProxy::LoadConfig()
-{
-    if (conf_path_.empty())
-    {
-        std::cerr << "Error, empty conf path" << std::endl;
-        return;
-    }
-
-    if (!std::filesystem::exists(conf_path_))
-    {
-        Json::Value packet_lists = {
-            { "ignored_clientbound", Json::Array() },
-            { "ignored_serverbound", Json::Array() },
-            { "detailed_clientbound", Json::Array() },
-            { "detailed_serverbound", Json::Array() },
-        };
-        Json::Value default_conf = {
-            { "LogToFile", true },
-            { "LogToConsole", false },
-            { "LogToReplay", false },
-            { "LogRawBytes", false },
-            { "Online", false },
-            { "NetworkRecapToConsole", false },
-            { "MicrosoftAccountCacheKey", "" },
-            { "Handshaking", packet_lists },
-            { "Status", packet_lists },
-            { "Login", packet_lists },
-            { "Play", packet_lists }
-        };
-        std::ofstream outfile(conf_path_, std::ios::out);
-        outfile << default_conf.Dump(4);
-    }
-
-    std::ifstream file = std::ifstream(conf_path_, std::ios::in);
-    if (!file.is_open())
-    {
-        std::cerr << "Error trying to open conf file: " << conf_path_ << "." << std::endl;
-        return;
-    }
-
-    Json::Value json;
-    file >> json;
-    file.close();
-
-    if (!json.is_object())
-    {
-        std::cerr << "Error parsing conf file at " << conf_path_ << "." << std::endl;
-        return;
-    }
-
-    if (json.contains("LogToReplay") && json["LogToReplay"].get<bool>())
-    {
-        replay_logger = std::make_unique<ReplayModLogger>(conf_path_);
-        replay_logger->SetServerName(server_ip_ + ":" + std::to_string(server_port_));
-    }
-
-#ifdef USE_ENCRYPTION
-    if (json.contains("Online") && json["Online"].get<bool>())
-    {
-        authentifier = std::make_unique<Botcraft::Authentifier>();
-
-        const std::string credentials_cache_key = json.contains("MicrosoftAccountCacheKey") ? json["MicrosoftAccountCacheKey"].get<std::string>() : "";
-
-        std::cout << "Trying to authenticate using Microsoft account" << std::endl;
-        if (!authentifier->AuthMicrosoft(credentials_cache_key))
-        {
-            std::cerr << "Error trying to authenticate with Microsoft account" << std::endl;
-            throw std::runtime_error("Error trying to authenticate with Microsoft account");
-        }
-    }
-#endif
 }
 
 void MinecraftProxy::Handle(Message& msg)

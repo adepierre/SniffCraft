@@ -21,10 +21,10 @@ class ReplayModLogger;
 class MinecraftProxy : public BaseProxy, public ProtocolCraft::Handler
 {
 public:
-    MinecraftProxy(asio::io_context& io_context, const std::string& conf_path);
+    MinecraftProxy(asio::io_context& io_context);
     virtual ~MinecraftProxy();
-    
-    virtual void Start(const std::string& server_address, const unsigned short server_port) override;
+
+    virtual void Start(const std::string& server_address, const unsigned short server_port, const std::string& conf_path) override;
 
 protected:
     virtual size_t ProcessData(const std::vector<unsigned char>::const_iterator& data, const size_t length, const Endpoint source) override;
@@ -40,8 +40,6 @@ private:
     /// @param msg Packet to convert
     /// @return Bytes representation of the packet
     std::vector<unsigned char> PacketToBytes(const ProtocolCraft::Message& msg) const;
-
-    void LoadConfig();
 
     virtual void Handle(ProtocolCraft::Message& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg) override;
@@ -64,8 +62,6 @@ private:
 #endif
 
 private:
-    std::string conf_path_;
-
     std::unique_ptr<Logger> logger;
     std::unique_ptr<ReplayModLogger> replay_logger;
 

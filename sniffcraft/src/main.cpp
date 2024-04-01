@@ -3,27 +3,21 @@
 
 int main(int argc, char* argv[])
 {
-   if (argc < 3)
+   if (argc < 1)
    {
-      std::cerr << "usage: sniffcraft <client_port> <server_address> <optional:logconf_path>" << std::endl;
-      return 1;
+      std::cerr << "usage: sniffcraft <optional:conf_path>" << std::endl;
    }
 
-   const short client_port = static_cast<short>(std::atoi(argv[1]));
-   const std::string server_address = argv[2];
-   std::string logconf_path = "conf.json";
-
-   if (argc == 4)
+   std::string conf_path = "";
+   if (argc > 1)
    {
-       logconf_path = argv[3];
+       conf_path = argv[1];
    }
-
-   asio::io_context io_context;
 
    try
    {
-       Server server = Server(io_context, client_port, server_address, logconf_path);
-       io_context.run();
+       Server server = Server(conf_path);
+       server.run();
    }
    catch(std::exception& e)
    {

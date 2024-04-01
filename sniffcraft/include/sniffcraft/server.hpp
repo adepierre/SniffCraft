@@ -1,41 +1,48 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
-#include <vector>
+#include <string>
 #include <thread>
-#include <asio.hpp>
+#include <vector>
 
-#include "sniffcraft/BaseProxy.hpp"
+#include <asio.hpp>
+#include "protocolCraft/Utilities/Json.hpp"
+
+class BaseProxy;
 
 class Server
 {
 public:
-    Server(asio::io_context& io_context, const unsigned short client_port,
-        const std::string& server_address, const std::string& conf_path_);
+    Server(const std::string& conf_path);
+    ~Server();
+    void run();
 
 private:
-    void start_accept();
+    void listen_connection();
     void handle_accept(BaseProxy* new_proxy, const asio::error_code &ec);
-    void ResolveIpPortFromAddress(const std::string& address);
+    void ResolveIpPortFromAddress();
 
-    /// @brief Clean old proxies and get a fresh one ready
-    /// @return A pointer to a BaseProxy item
-    BaseProxy* GetNewProxy();
+    BaseProxy* GetNewMinecraftProxy();
+
+    ProtocolCraft::Json::Value LoadConf() const;
+    void SaveConf(const ProtocolCraft::Json::Value& conf) const;
 
     void CleanProxies();
     
 private:
-    asio::io_context& io_context_;
-    asio::ip::tcp::acceptor acceptor_;
-
-    std::string server_ip_;
-    unsigned short server_port_;
-    unsigned short client_port_;
-
     std::string conf_path;
+    std::string server_address;
+    std::string server_ip;
+    unsigned short server_port;
+    unsigned short client_port;
+
+    asio::io_context io_context;
+    std::unique_ptr<asio::ip::tcp::acceptor> acceptor;
 
     std::vector<std::unique_ptr<BaseProxy>> proxies;
     std::mutex proxies_mutex;
     std::thread proxies_cleaning_thread;
-};
 
+    std::atomic<bool> running;
+};
