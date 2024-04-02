@@ -3,6 +3,7 @@ project(sniffcraft)
 set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/BaseProxy.hpp
     include/sniffcraft/Compression.hpp
+    include/sniffcraft/conf.hpp
     include/sniffcraft/Connection.hpp
     include/sniffcraft/DataProcessor.hpp
     include/sniffcraft/enums.hpp

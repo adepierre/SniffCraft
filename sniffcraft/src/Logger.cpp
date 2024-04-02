@@ -1,3 +1,4 @@
+#include "sniffcraft/conf.hpp"
 #include "sniffcraft/FileUtilities.hpp"
 #include "sniffcraft/Logger.hpp"
 
@@ -246,51 +247,51 @@ void Logger::LoadConfig(const std::string& path)
     }
 
     const std::map<std::string, ConnectionState> name_mapping = {
-        {"Handshaking", ConnectionState::Handshake},
-        {"Status", ConnectionState::Status},
-        {"Login", ConnectionState::Login},
-        {"Play", ConnectionState::Play},
+        { handshaking_key, ConnectionState::Handshake },
+        { status_key, ConnectionState::Status },
+        { login_key, ConnectionState::Login },
+        { play_key, ConnectionState::Play },
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
-        {"Configuration", ConnectionState::Configuration},
+        { configuration_key, ConnectionState::Configuration },
 #endif
     };
 
     log_to_file = true;
 
-    if (json.contains("LogToFile") && !json["LogToFile"].get<bool>())
+    if (json.contains(text_file_log_key) && !json[text_file_log_key].get<bool>())
     {
         log_to_file = false;
     }
 
     log_to_console = false;
 
-    if (!json.contains("LogToConsole"))
+    if (!json.contains(console_log_key))
     {
         log_to_console = false;
     }
     else
     {
-        log_to_console = json["LogToConsole"].get<bool>();
+        log_to_console = json[console_log_key].get<bool>();
     }
 
-    if (!json.contains("NetworkRecapToConsole"))
+    if (!json.contains(network_recap_to_console_key))
     {
         log_network_recap_console = false;
     }
     else
     {
-        log_network_recap_console = json["NetworkRecapToConsole"].get<bool>();
+        log_network_recap_console = json[network_recap_to_console_key].get<bool>();
     }
 
     log_raw_bytes = false;
 
-    if (!json.contains("LogRawBytes"))
+    if (!json.contains(raw_bytes_log_key))
     {
         log_raw_bytes = false;
     }
     else
     {
-        log_raw_bytes = json["LogRawBytes"].get<bool>();
+        log_raw_bytes = json[raw_bytes_log_key].get<bool>();
     }
 
     for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
@@ -319,9 +320,9 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
         return;
     }
 
-    if (value.contains("ignored_clientbound") && value["ignored_clientbound"].is_array())
+    if (value.contains(ignored_clientbound_key) && value[ignored_clientbound_key].is_array())
     {
-        for (const auto& val : value["ignored_clientbound"].get_array())
+        for (const auto& val : value[ignored_clientbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -343,9 +344,9 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
         }
     }
 
-    if (value.contains("ignored_serverbound") && value["ignored_serverbound"].is_array())
+    if (value.contains(ignored_serverbound_key) && value[ignored_serverbound_key].is_array())
     {
-        for (const auto& val : value["ignored_serverbound"].get_array())
+        for (const auto& val : value[ignored_serverbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -367,9 +368,9 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
         }
     }
 
-    if (value.contains("detailed_clientbound") && value["detailed_clientbound"].is_array())
+    if (value.contains(detailed_clientbound_key) && value[detailed_clientbound_key].is_array())
     {
-        for (const auto& val : value["detailed_clientbound"].get_array())
+        for (const auto& val : value[detailed_clientbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -391,9 +392,9 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
         }
     }
 
-    if (value.contains("detailed_serverbound") && value["detailed_serverbound"].is_array())
+    if (value.contains(detailed_serverbound_key) && value[detailed_serverbound_key].is_array())
     {
-        for (const auto& val : value["detailed_serverbound"].get_array())
+        for (const auto& val : value[detailed_serverbound_key].get_array())
         {
             if (val.is_number())
             {

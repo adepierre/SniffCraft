@@ -14,6 +14,7 @@
 #endif
 
 #include "sniffcraft/Compression.hpp"
+#include "sniffcraft/conf.hpp"
 #include "sniffcraft/MinecraftProxy.hpp"
 #include "sniffcraft/Logger.hpp"
 #include "sniffcraft/ReplayModLogger.hpp"
@@ -60,18 +61,18 @@ void MinecraftProxy::Start(const std::string& server_address, const unsigned sho
 
     logger = std::make_unique<Logger>(conf_path);
 
-    if (conf.contains("LogToReplay") && conf["LogToReplay"].get<bool>())
+    if (conf.contains(replay_log_key) && conf[replay_log_key].get<bool>())
     {
         replay_logger = std::make_unique<ReplayModLogger>(conf_path);
         replay_logger->SetServerName(server_address + ":" + std::to_string(server_port));
     }
 
 #ifdef USE_ENCRYPTION
-    if (conf.contains("Online") && conf["Online"].get<bool>())
+    if (conf.contains(online_key) && conf[online_key].get<bool>())
     {
         authentifier = std::make_unique<Botcraft::Authentifier>();
 
-        const std::string credentials_cache_key = conf.contains("MicrosoftAccountCacheKey") ? conf["MicrosoftAccountCacheKey"].get<std::string>() : "";
+        const std::string credentials_cache_key = conf.contains(account_cache_key_key) ? conf[account_cache_key_key].get<std::string>() : "";
 
         std::cout << "Trying to authenticate using Microsoft account" << std::endl;
         if (!authentifier->AuthMicrosoft(credentials_cache_key))

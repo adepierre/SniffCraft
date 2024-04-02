@@ -1,3 +1,4 @@
+#include "sniffcraft/conf.hpp"
 #include "sniffcraft/MinecraftProxy.hpp"
 #include "sniffcraft/server.hpp"
 
@@ -37,24 +38,24 @@ Server::Server(const std::string& conf_path)
     const ProtocolCraft::Json::Value conf = LoadConf();
 
     client_port = 8686;
-    if (!conf.contains("LocalPort") || !conf["LocalPort"].is_number())
+    if (!conf.contains(local_port_key) || !conf[local_port_key].is_number())
     {
         std::cerr << "Warning, no valid LocalPort in conf file, using default 8686 instead" << std::endl;
     }
     else
     {
-        client_port = conf["LocalPort"].get_number<unsigned short>();
+        client_port = conf[local_port_key].get_number<unsigned short>();
     }
     acceptor = std::make_unique<asio::ip::tcp::acceptor>(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), client_port));
 
     server_address = "127.0.0.1:25565";
-    if (!conf.contains("ServerAddress") || !conf["ServerAddress"].is_string())
+    if (!conf.contains(server_address_key) || !conf[server_address_key].is_string())
     {
         std::cerr << "Warning, no valid ServerAddress in conf file, using default 127.0.0.1:25565 instead" << std::endl;
     }
     else
     {
-        server_address = conf["ServerAddress"].get_string();
+        server_address = conf[server_address_key].get_string();
     }
     ResolveIpPortFromAddress();
 
@@ -213,27 +214,27 @@ ProtocolCraft::Json::Value Server::LoadConf() const
     if (!std::filesystem::exists(conf_path))
     {
         Json::Value packet_lists = {
-            { "ignored_clientbound", Json::Array() },
-            { "ignored_serverbound", Json::Array() },
-            { "detailed_clientbound", Json::Array() },
-            { "detailed_serverbound", Json::Array() },
+            { ignored_clientbound_key, Json::Array() },
+            { ignored_serverbound_key, Json::Array() },
+            { detailed_clientbound_key, Json::Array() },
+            { detailed_serverbound_key, Json::Array() },
         };
         Json::Value default_conf = {
-            { "ServerAddress", "127.0.0.1:25565" },
-            { "LocalPort", 8686 },
-            { "LogToTxtFile", true },
-            { "LogToConsole", false },
-            { "LogToReplay", false },
-            { "LogRawBytes", false },
-            { "Online", false },
-            { "Headless", false },
-            { "NetworkRecapToConsole", false },
-            { "MicrosoftAccountCacheKey", "" },
-            { "Handshaking", packet_lists },
-            { "Status", packet_lists },
-            { "Login", packet_lists },
-            { "Configuration", packet_lists },
-            { "Play", packet_lists }
+            { server_address_key, "127.0.0.1:25565" },
+            { local_port_key, 8686 },
+            { text_file_log_key, true },
+            { console_log_key, false },
+            { replay_log_key, false },
+            { raw_bytes_log_key, false },
+            { online_key, false },
+            { headless_key, false },
+            { network_recap_to_console_key, false },
+            { account_cache_key_key, "" },
+            { handshaking_key, packet_lists },
+            { status_key, packet_lists },
+            { login_key, packet_lists },
+            { configuration_key, packet_lists },
+            { play_key, packet_lists }
         };
         std::ofstream outfile(conf_path, std::ios::out);
         outfile << default_conf.Dump(4);
