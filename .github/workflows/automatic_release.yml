@@ -39,30 +39,30 @@ jobs:
     needs:
       - build_os_matrix
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Download Linux artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: sniffcraft-Linux
           path: linux
 
       - name: Download Windows artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: sniffcraft-Windows
           path: windows
 
       - name: Download macOS artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: sniffcraft-macOS
           path: macos
 
       - name: Download version artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: MC-version
           path: version
