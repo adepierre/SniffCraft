@@ -21,13 +21,15 @@ on:
 env:
   BUILD_TYPE: Release
   CMAKE_GENERATOR: ${{ inputs.os == 'windows-latest' && 'Visual Studio 17 2022' || 'Unix Makefiles' }}
+  VERSION: ${{ inputs.version }}
+  ISSUE_URL: ${{ inputs.issue }}
 
 jobs:
   build:
     runs-on: ${{ inputs.os }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
@@ -40,7 +42,7 @@ jobs:
         run: >
           cmake -G "$CMAKE_GENERATOR"
           -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-          -DGAME_VERSION=${{ inputs.version }}
+          -DGAME_VERSION="$VERSION"
           -DSNIFFCRAFT_WITH_ENCRYPTION=ON
           -DSNIFFCRAFT_FORCE_LOCAL_ZLIB=ON
           -DSNIFFCRAFT_FORCE_LOCAL_OPENSSL=ON
@@ -49,7 +51,7 @@ jobs:
 
       - name: Upload version artifact
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: MC-version
           path: ${{ runner.workspace }}/build/version.txt
@@ -69,12 +71,12 @@ jobs:
           echo -en '\n' >> body.txt
           echo -en '\n' >> body.txt
           echo @${{ github.repository_owner }} you might want to take a look. >> body.txt
-          gh issue comment ${{ inputs.issue }} --repo ${{ github.repository }} --body-file body.txt
+          gh issue comment $ISSUE_URL --repo ${{ github.repository }} --body-file body.txt
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sniffcraft-${{ runner.os }}
           path: ${{ github.workspace }}/bin/sniffcraft*
