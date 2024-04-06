@@ -42,7 +42,12 @@ void Connection::StartListeningAndWriting()
     socket.async_read_some(asio::buffer(read_buffer.data(), BUFFER_SIZE),
         std::bind(&Connection::handle_read, this,
             std::placeholders::_1, std::placeholders::_2));
+    write_thread_started = false;
     write_thread = std::thread(&Connection::WriteLoop, this);
+    while (!write_thread_started)
+    {
+
+    }
 }
 
 void Connection::WriteData(const unsigned char* const data, const size_t length)
@@ -80,6 +85,7 @@ bool Connection::Closed() const
 
 void Connection::WriteLoop()
 {
+    write_thread_started = true;
     // Run indefinitely
     while (!closed)
     {
