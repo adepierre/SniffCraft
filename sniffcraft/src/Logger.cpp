@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <sstream>
 #include <string>
 
@@ -249,9 +250,9 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
                 sec -= min * 60;
                 min -= hours * 60;
 
-                ImGui::Text("[%d:%02d:%02d:%03d]", hours, min, sec, millisec);
+                ImGui::Text("[%ld:%02ld:%02ld:%03ld]", hours, min, sec, millisec);
                 ImGui::SameLine();
-                ImGui::Text("[%d]", packets_history_filtered_indices[i]);
+                ImGui::Text("[%ld]", packets_history_filtered_indices[i]);
                 ImGui::SameLine();
                 ImGui::TextUnformatted(ConnectionStateToString(item.connection_state).data());
                 ImGui::SameLine();
@@ -659,6 +660,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
 #endif
         }
     }
+    return -1;
 }
 
 void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState connection_state)
@@ -790,6 +792,7 @@ std::string_view Logger::ConnectionStateToString(const ConnectionState connectio
         return "[Configuration]";
 #endif
     }
+    return "";
 }
 
 std::string Logger::GetPacketName(const LogItem& item) const
@@ -1306,7 +1309,7 @@ void RenderJson(const Json::Value& json, const int indent_level)
         for (const auto& [k, v] : json.get_object())
         {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.5f, 1.0f));
-            ImGui::Text((indent_string + "  \"" + k + "\": ").c_str());
+            ImGui::TextUnformatted((indent_string + "  \"" + k + "\": ").c_str());
             ImGui::PopStyleColor();
             ImGui::SameLine(0.0f, 0.0f);
             RenderJson(v, indent_level + 1);
@@ -1325,7 +1328,7 @@ void RenderJson(const Json::Value& json, const int indent_level)
         size_t index = 0;
         for (const auto& v : json.get_array())
         {
-            ImGui::Text((indent_string + "  ").c_str());
+            ImGui::TextUnformatted((indent_string + "  ").c_str());
             ImGui::SameLine(0.0f, 0.0f);
             RenderJson(v, indent_level + 1);
             index += 1;
@@ -1344,31 +1347,31 @@ void RenderJson(const Json::Value& json, const int indent_level)
     else if (json.is_string())
     {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.75f, 1.0f, 1.0f));
-        ImGui::Text(('"' + json.get_string() + '"').c_str());
+        ImGui::TextUnformatted(('"' + json.get_string() + '"').c_str());
         ImGui::PopStyleColor();
     }
     else if (json.is<unsigned long long int>())
     {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
-        ImGui::Text(std::to_string(json.get_number<unsigned long long int>()).c_str());
+        ImGui::TextUnformatted(std::to_string(json.get_number<unsigned long long int>()).c_str());
         ImGui::PopStyleColor();
     }
     else if (json.is<long long int>())
     {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
-        ImGui::Text(std::to_string(json.get_number<long long int>()).c_str());
+        ImGui::TextUnformatted(std::to_string(json.get_number<long long int>()).c_str());
         ImGui::PopStyleColor();
     }
     else if (json.is_number())
     {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
-        ImGui::Text(std::to_string(json.get_number()).c_str());
+        ImGui::TextUnformatted(std::to_string(json.get_number()).c_str());
         ImGui::PopStyleColor();
     }
     else if (json.is_bool())
     {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.75f, 1.0f));
-        ImGui::Text((json.get<bool>() ? "true" : "false"));
+        ImGui::TextUnformatted((json.get<bool>() ? "true" : "false"));
         ImGui::PopStyleColor();
     }
 }

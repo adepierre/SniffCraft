@@ -8,6 +8,7 @@
 #include <protocolCraft/Message.hpp>
 #include <protocolCraft/Utilities/Json.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <ctime>

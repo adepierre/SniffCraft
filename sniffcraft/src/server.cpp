@@ -248,7 +248,7 @@ void Server::Render()
     GLFWwindow* window = glfwCreateWindow(960, 960, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
-        std::cerr << "Failed to create GLFW window" << std::endl;
+        std::cerr << "Failed to create GLFW window, you can launch SniffCraft without GUI with the --headless argument" << std::endl;
         glfwTerminate();
         return;
     }
@@ -754,7 +754,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 else
                 {
-                    ImGui::Text("Any connection on 127.0.0.1:%i will be redirected to %s:%i", client_port, server_ip, server_port);
+                    ImGui::Text("Any connection on 127.0.0.1:%i will be redirected to %s:%i", client_port, server_ip.c_str(), server_port);
                 }
             }
 
