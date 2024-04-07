@@ -1,9 +1,9 @@
 #include "sniffcraft/ReplayModLogger.hpp"
 #include "sniffcraft/Zip/ZeptoZip.hpp"
 
-#include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
 using namespace ProtocolCraft;
 
@@ -81,25 +81,20 @@ void ReplayModLogger::LogConsume()
                 logging_queue.pop();
             }
 
-            auto total_millisec = std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count();
-
             if (item.origin == Endpoint::Server || item.origin == Endpoint::SniffcraftToClient)
             {
                 std::vector<unsigned char> packet;
                 // Write ID + Packet data
                 item.msg->Write(packet);
 
-                // Get total size
-                std::vector<unsigned char> packet_size;
-                WriteData<int>(static_cast<int>(packet.size()), packet_size);
-
                 // Get timestamp in ms
-                std::vector<unsigned char> timestamp;
-                WriteData<int>(static_cast<int>(total_millisec), timestamp);
+                std::vector<unsigned char> header;
+                WriteData<int>(static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count()), header);
+                // Get total size
+                WriteData<int>(static_cast<int>(packet.size()), header);
 
-                replay_file.write((char*)timestamp.data(), timestamp.size());
-                replay_file.write((char*)packet_size.data(), packet_size.size());
-                replay_file.write((char*)packet.data(), packet.size());
+                replay_file.write(reinterpret_cast<const char*>(header.data()), header.size());
+                replay_file.write(reinterpret_cast<const char*>(packet.data()), packet.size());
             }
         }
     }
