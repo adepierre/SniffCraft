@@ -33,6 +33,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y xorg-dev
+
       - name: Create build folder
         run: cmake -E make_directory ${{ runner.workspace }}/build
 
