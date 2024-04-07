@@ -3,7 +3,7 @@
 
 # SniffCraft
 
-SniffCraft is a cross-platform C++ proxy which let you inspect the content of each packet sent through any minecraft client and server.
+SniffCraft is a cross-platform C++ proxy which let you inspect the content of each packet sent through any minecraft client and server. It can run either with a GUI or in headless mode.
 
 It works as a man-in-the-middle: instead of connecting directly to the server, you ask your client to connect to SniffCraft which then is connected to the server. All packets are transmitted to their original recipient and are simultaneously logged on-the-fly.
 
@@ -21,61 +21,20 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 ## Features
 
 - Supported minecraft versions: all official releases from 1.12.2 to 1.20.4
+- GUI mode
 - Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
-- Detailed network usage recap at the end of the session
+- Detailed network usage recap
 - Compression is supported
 - Offline ("cracked") mode and online mode (with Microsoft account) are supported
 - Secure chat is supported
 - Logging raw packets at byte level
 - Configuration (which packet to log/ignore) can be changed on-the-fly without restarting
 - Automatically create a session file to log information, can also optionally log to console at the same time
+- Save full session to binary file and reopen them later in the GUI
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
 - No log at all is possible, in this case, SniffCraft becomes a pure proxy that you can adapt to block/modify any packet you want
 
-Here is an example of a captured session:
-```javascript
-[0:00:48:050] [Play] [S --> C] Block Changed Ack
-[0:00:48:064] [Play] [C --> S] Swing
-[0:00:48:115] [Play] [C --> S] Swing
-[0:00:48:166] [Play] [C --> S] Swing
-[0:00:49:315] [Play] [C --> S] Use Item On
-{
-    "cursor_position_x": 0.0,
-    "cursor_position_y": 0.9097926616668701,
-    "cursor_position_z": 0.17363852262496948,
-    "direction": 4,
-    "hand": 0,
-    "inside": false,
-    "location": {
-        "x": -119,
-        "y": 83,
-        "z": 261
-    },
-    "sequence": 11
-}
-[0:00:49:348] [Play] [S --> C] Block Changed Ack
-```
-And an example of the summary you can find at the end of the session logfile:
-```bash
-+============================================================+  +================================================================+
-|                     Server ---> Client                     |  |                       Client ---> Server                       |
-+============================================================+  +================================================================+
-|          Name          |     Count      |    Bandwidth     |  |              Name              |    Count     |   Bandwidth    |
-+------------------------+----------------+------------------+  +--------------------------------+--------------+----------------+
-| Total                  | 23862 (100.0%) | 8340248 (100.0%) |  | Total                          | 902 (100.0%) | 28156 (100.0%) |
-| Level Chunk With Light |  1558 ( 6.53%) | 7988945 (95.79%) |  | Move Player PosRot             | 481 (53.33%) | 17316 (61.50%) |
-| Move Entity PosRot     |  4001 (16.77%) |   55894 ( 0.67%) |  | Move Player Pos                | 368 (40.80%) | 10304 (36.60%) |
-| Move Entity Pos        |  4495 (18.84%) |   53568 ( 0.64%) |  | Move Player Rot                |  19 ( 2.11%) |   228 ( 0.81%) |
-| Set Entity Motion      |  3854 (16.15%) |   42083 ( 0.50%) |  | Player Command                 |  26 ( 2.88%) |   182 ( 0.65%) |
-| Rotate Head            |  6240 (26.15%) |   36836 ( 0.44%) |  | Chat Command                   |   1 ( 0.11%) |    42 ( 0.15%) |
-| Set Entity Data        |   745 ( 3.12%) |   27726 ( 0.33%) |  | Keep Alive                     |   3 ( 0.33%) |    33 ( 0.12%) |
-| Light Update           |    66 ( 0.28%) |   23880 ( 0.29%) |  | Custom Payload|minecraft:brand |   1 ( 0.11%) |    27 ( 0.10%) |
-| Add Entity             |   373 ( 1.56%) |   20832 ( 0.25%) |  | Client Information             |   1 ( 0.11%) |    16 ( 0.06%) |
-| Update Recipes         |     1 ( 0.00%) |   19738 ( 0.24%) |  | Accept Teleportation           |   1 ( 0.11%) |     4 ( 0.01%) |
-| Update Attributes      |   330 ( 1.38%) |   15965 ( 0.19%) |  | Move Player Status Only        |   1 ( 0.11%) |     4 ( 0.01%) |
-| Forget Level Chunk     |  1160 ( 4.86%) |   12760 ( 0.15%) |  |                                |              |                |
-+------------------------+----------------+------------------+  +--------------------------------+--------------+----------------+
-```
+<img width="600" src="https://github.com/adepierre/SniffCraft/assets/24371370/8c6b04d3-61e6-4fdc-aa1e-7e9505ac6033" alt="Sniffcraft GUI" align="center">
 
 
 ### Encryption is supported
@@ -98,6 +57,9 @@ Sniffcraft has been confirmed to work with heavily modded client/server using Fo
 
 If you want to print the content of Custom Payload packets (both from client and server), you need to use protocolCraft plugins to extend the protocol knowledge with mod-specific packets. See the [protocolCraft-plugin](https://github.com/adepierre/protocolcraft-plugin) repo for details.
 
+## GUI support
+
+If compiled with the cmake option SNIFFCRAFT_WITH_GUI, a GUI will appear when starting SniffCraft. This can be disabled by launching it with the ``--headless`` command line argument. In GUI mode, packets data are kept in memory while the session is displayed in GUI. This is usually not really an issue for regular usecase. However, if you plan to do some multi-hours long capture sessions or have a lot of sessions running simultaneously, it is recommended to use the ``--headless`` argument (or SniffCraft compiled without GUI enabled). This way, all data will only be stored in files and not in the RAM. SniffCraft binary files (**NOT** text files) can be reimported later in the GUI by simply dragging them onto SniffCraft window.
 
 ## Dependencies
 
@@ -108,29 +70,34 @@ You don't have to install any dependency to build SniffCraft, everything that is
 - [openssl](https://www.openssl.org/) (optional, only if cmake option SNIFFCRAFT_WITH_ENCRYPTION is set)
 - [botcraft](https://github.com/adepierre/botcraft)
 
+GUI dependencies (only if cmake option SNIFFCRAFT_WITH_GUI is set)
+- [glad](https://github.com/Dav1dde/glad)
+- [glfw](https://github.com/glfw/glfw)
+- [Dear ImGui](https://github.com/ocornut/imgui)
+
 ## Build and launch
 
-Precompiled binaries for the latest game version with encryption support can be found in the [latest release](https://github.com/adepierre/SniffCraft/releases/tag/latest). If you want to build it yourself:
+Precompiled binaries for the latest game version with encryption and GUI support can be found in the [latest release](https://github.com/adepierre/SniffCraft/releases/tag/latest). If you want to build it yourself:
 ```
 git clone https://github.com/adepierre/SniffCraft.git
 cd SniffCraft
 mkdir build
 cd build
-cmake -DGAME_VERSION=latest -DSNIFFCRAFT_WITH_ENCRYPTION=ON ..
+cmake -DGAME_VERSION=latest -DSNIFFCRAFT_WITH_ENCRYPTION=ON -DSNIFFCRAFT_WITH_GUI=ON ..
 cmake --build . --config Release
 ```
 
 If you need more help, you can join the Sniffcraft/Botcraft community [discord server](https://discord.gg/wECVsTbjA9).
 
-Once built, you can start SniffCraft with the following command line (by default output executable file can be found in ``bin`` folder next to the source code:
+Once built, you can start SniffCraft by double clicking the executable (by default, compiled executable file can be found in ``bin`` folder next to the source code), or with the following command line:
 
 ```
-sniffcraft listening_port server_address conf_filepath
+sniffcraft <optional:--headless> <optional:conf/file/path>
 ```
 
-conf_filepath is the path to a json file, and can be used to set authentication information and filter out the packets. Examples can be found in the [conf](conf/) directory. With the default configuration, only the names of the packets are logged. When a packet is added to an ignored list, it won't appear in the logs, when it's in a detail list, its full content will be logged. Packets can be added either by id or by name (as registered in protocolCraft), but as id can vary from one version to another, using names is safer.
+conf/file/path is the path to a json file, and can be used to set authentication information and filter out the packets. Examples can be found in the [conf](conf/) directory. If no path is given, a default conf.json file will be created. With the default configuration, only the names of the packets are logged. When a packet is added to an ignored list, it won't appear in the logs, when it's in a detail list, its full content will be logged. Packets can be added either by id or by name (as registered in protocolCraft), but as id can vary from one version to another, using names is safer.
 
-server_address should match the address of the server you want to connect to, with the same format as in a regular minecraft client. Custom URL with DNS SRV records are supported (like MyServer.Example.net for example). You can then connect your official minecraft client to SniffCraft as if it were a regular server. If you are running SniffCraft on the same computer as your client, something as 127.0.0.1:listening_port should work.
+ServerAddress should match the address of the server you want to connect to, with the same format as in a regular minecraft client. Custom URL with DNS SRV records are supported (like MyServer.Example.net for example). You can then connect your official minecraft client to SniffCraft as if it were a regular server using <your computer IP:LocalPort>. If you are running SniffCraft on the same computer as your client, something like 127.0.0.1:LocalPort should work.
 
 ## Replay Mod
 
