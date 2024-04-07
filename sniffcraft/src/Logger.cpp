@@ -1,31 +1,119 @@
 #include "sniffcraft/conf.hpp"
-#include "sniffcraft/FileUtilities.hpp"
+#include "sniffcraft/Compression.hpp"
 #include "sniffcraft/Logger.hpp"
+#include "sniffcraft/PacketUtilities.hpp"
 
+#include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <iomanip>
-#include <cmath>
+#include <string>
 
-#include <protocolCraft/MessageFactory.hpp>
 #include <protocolCraft/Handler.hpp>
+#include <protocolCraft/MessageFactory.hpp>
+
+#ifdef WITH_GUI
+#include <imgui.h>
+#endif
 
 using namespace ProtocolCraft;
 
-Logger::Logger(const std::string &conf_path)
+Logger::Logger()
 {
     start_time = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
+
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d-%H-%M-%S");
+    base_filename = ss.str();
 
     last_time_checked_conf_file = 0;
-    last_time_conf_file_modified = 0;
+    last_time_conf_file_loaded = 0;
     last_time_network_recap_printed = 0;
 
-    logconf_path = conf_path;
-    LoadConfig(logconf_path);
+    LoadConfig();
 
     is_running = true;
     log_thread = std::thread(&Logger::LogConsume, this);
 }
+
+#ifdef WITH_GUI
+Logger::Logger(const std::filesystem::path& path)
+{
+    base_filename = path.stem().string();
+    is_running = false;
+    last_time_checked_conf_file = 0;
+    last_time_conf_file_loaded = 0;
+    last_time_network_recap_printed = 0;
+
+    std::ifstream file(path, std::ios::in | std::ios::binary);
+    file.unsetf(std::ios::skipws);
+    std::vector<unsigned char> data((std::istream_iterator<char>(file)), std::istream_iterator<char>());
+    file.close();
+
+    ReadIterator iter = data.cbegin();
+    size_t length = data.size();
+
+    int protocol_version = ReadData<VarInt>(iter, length);
+    if (protocol_version != PROTOCOL_VERSION)
+    {
+        std::cerr << "Trying to open a capture for protocol version " << protocol_version << " but this version of sniffcraft is compiled for: " << PROTOCOL_VERSION << std::endl;
+        throw std::runtime_error("Trying to open a capture file with wrong protocol version");
+    }
+    start_time = std::chrono::system_clock::time_point(std::chrono::milliseconds(ReadData<VarLong>(iter, length)));
+
+    while (length > 0)
+    {
+        std::scoped_lock lock(packets_history_mutex, network_recap_mutex);
+        LogItem item;
+        const bool compressed = ReadData<bool>(iter, length);
+        const size_t data_size = ReadData<VarInt>(iter, length);
+        ReadIterator packet_iter = iter;
+        size_t remaining_size = data_size;
+        std::vector<unsigned char> decompressed;
+        if (compressed)
+        {
+            decompressed = Decompress(&(*iter), data_size);
+            packet_iter = decompressed.begin();
+            remaining_size = decompressed.size();
+        }
+        item.connection_state = static_cast<ConnectionState>(static_cast<int>(ReadData<VarInt>(packet_iter, remaining_size)));
+        item.origin = static_cast<Endpoint>(static_cast<int>(ReadData<VarInt>(packet_iter, remaining_size)));
+        item.date = start_time + std::chrono::milliseconds(ReadData<VarLong>(packet_iter, remaining_size));
+        item.bandwidth_bytes = static_cast<size_t>(ReadData<VarLong>(packet_iter, remaining_size));
+        int msg_id = ReadData<VarInt>(packet_iter, remaining_size);
+        const Endpoint origin = SimpleOrigin(item.origin);
+        item.msg = origin == Endpoint::Server ? CreateClientboundMessage(item.connection_state, msg_id) : CreateServerboundMessage(item.connection_state, msg_id);
+        if (item.msg == nullptr)
+        {
+            std::cerr << "Error loading the binary file. This might be a bug, please report it. Stopping loading here" << std::endl;
+            break;
+        }
+        item.msg->Read(packet_iter, remaining_size);
+        if (item.bandwidth_bytes != 0)
+        {
+            // Update the recaps
+            const std::string packet_name = GetPacketName(item);
+            std::map<std::string, NetworkRecapItem>& recap_data_map = (origin == Endpoint::Server ? clientbound_network_recap_data : serverbound_network_recap_data);
+            NetworkRecapItem& recap = recap_data_map[packet_name];
+            recap.count += 1;
+            recap.bandwidth_bytes += item.bandwidth_bytes;
+            NetworkRecapItem& total_recap = (origin == Endpoint::Server ? clientbound_total_network_recap : serverbound_total_network_recap);
+            total_recap.count += 1;
+            total_recap.bandwidth_bytes += item.bandwidth_bytes;
+        }
+        // Add this item to the packet history
+        packets_history.push_back(std::move(item));
+
+        length -= data_size;
+        iter += data_size;
+    }
+
+    data.clear();
+
+    LoadConfig();
+}
+#endif
 
 Logger::~Logger()
 {
@@ -40,7 +128,15 @@ Logger::~Logger()
     if (log_to_file)
     {
         log_file << GenerateNetworkRecap() << std::endl;
+    }
+    if (log_file.is_open())
+    {
         log_file.close();
+    }
+
+    if (binary_file.is_open())
+    {
+        binary_file.close();
     }
 
     if (log_thread.joinable())
@@ -52,19 +148,152 @@ Logger::~Logger()
 void Logger::Log(const std::shared_ptr<Message>& msg, const ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
-    if (log_to_file && !log_file.is_open())
+    bool need_to_create_txt_file = log_to_file && !log_file.is_open();
+    bool need_to_create_binary_file = log_to_binary_file && !binary_file.is_open();
+    if (need_to_create_txt_file || need_to_create_binary_file)
     {
-        auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
+        if (need_to_create_txt_file)
+        {
+            log_file = std::ofstream(base_filename + "_sclogs.txt", std::ios::out);
+        }
 
-        std::stringstream ss;
-        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d-%H-%M-%S");
-
-        log_file = std::ofstream(ss.str() + "_log.txt", std::ios::out);
+        if (need_to_create_binary_file)
+        {
+            binary_file = std::ofstream(base_filename + ".scbin", std::ios::out|std::ios::binary);
+            std::vector<unsigned char> header;
+            WriteData<VarInt>(PROTOCOL_VERSION, header);
+            WriteData<VarLong>(static_cast<long long int>(std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count()), header);
+            binary_file.write(reinterpret_cast<const char*>(header.data()), header.size());
+        }
     }
 
     logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin, bandwidth_bytes });
     log_condition.notify_all();
 }
+
+const std::string& Logger::GetBaseFilename() const
+{
+    return base_filename;
+}
+
+void Logger::Stop()
+{
+    is_running = false;
+    log_condition.notify_all();
+}
+
+#ifdef WITH_GUI
+void RenderJson(const Json::Value& json, const int indent_level = 0);
+
+void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title);
+
+std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
+{
+    std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> return_value = { nullptr, ConnectionState::None, Endpoint::Client };
+    ImGui::PushID(base_filename.c_str());
+
+    const float half_size = 0.5f * (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
+    if (ImGui::BeginChild("##packet_names", ImVec2(half_size * 1.15f, 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar))
+    {
+        std::scoped_lock lock(packets_history_mutex);
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(packets_history_filtered_indices.size()), ImGui::GetTextLineHeightWithSpacing());
+        while (clipper.Step())
+        {
+            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+            {
+                ImGui::PushID(i);
+                const LogItem& item = packets_history[packets_history_filtered_indices[i]];
+
+                ImGui::SetNextItemAllowOverlap();
+                if (ImGui::Selectable(("##" + std::to_string(i)).c_str(), selected_index == packets_history_filtered_indices[i], ImGuiSelectableFlags_None, ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
+                {
+                    // Select if not selected, deselect if already selected
+                    selected_index = packets_history_filtered_indices[i] == selected_index ? -1 : packets_history_filtered_indices[i];
+                    if (selected_index != -1)
+                    {
+                        selected_json = item.msg->Serialize();
+                    }
+                }
+                if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
+                {
+                    ImGui::Text("ID: %i", item.msg->GetId());
+                    ImGui::EndTooltip();
+                }
+                ImGui::SameLine();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));;
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));;
+                if (ImGui::Button("X", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
+                {
+                    return_value = { item.msg, item.connection_state, SimpleOrigin(item.origin) };
+                    if (selected_index == packets_history_filtered_indices[i])
+                    {
+                        selected_index = -1;
+                    }
+                }
+                ImGui::PopStyleVar();
+                ImGui::PopStyleVar();
+                if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
+                {
+                    ImGui::TextUnformatted("Add to ignore list");
+                    ImGui::EndTooltip();
+                }
+                ImGui::SameLine();
+                const std::chrono::system_clock::duration diff = item.date - start_time;
+                auto hours = std::chrono::duration_cast<std::chrono::hours>(diff).count();
+                auto min = std::chrono::duration_cast<std::chrono::minutes>(diff).count();
+                auto sec = std::chrono::duration_cast<std::chrono::seconds>(diff).count();
+                auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
+
+                millisec -= sec * 1000;
+                sec -= min * 60;
+                min -= hours * 60;
+
+                ImGui::Text("[%d:%02d:%02d:%03d]", hours, min, sec, millisec);
+                ImGui::SameLine();
+                ImGui::Text("[%d]", packets_history_filtered_indices[i]);
+                ImGui::SameLine();
+                ImGui::TextUnformatted(ConnectionStateToString(item.connection_state).data());
+                ImGui::SameLine();
+                ImGui::TextUnformatted(OriginToString(item.origin).data());
+                ImGui::SameLine();
+                ImGui::TextUnformatted(GetPacketName(item).c_str());
+                ImGui::PopID();
+            }
+        }
+        clipper.End();
+        if (selected_index == -1)
+        {
+            ImGui::SetScrollHereY();
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+    ImGui::BeginChild("##json_display", ImVec2(half_size * 0.85f, 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
+    if (selected_index != -1)
+    {
+        RenderJson(selected_json, 0);
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Copy").x - ImGui::GetStyle().FramePadding.x * 3 - ImGui::GetStyle().ScrollbarSize + ImGui::GetScrollX());
+        ImGui::SetCursorPosY(ImGui::GetStyle().FramePadding.y + ImGui::GetScrollY());
+        if (ImGui::Button("Copy"))
+        {
+            ImGui::SetClipboardText(selected_json.Dump(4).c_str());
+        }
+    }
+    ImGui::EndChild();
+
+    {
+        std::scoped_lock<std::mutex> lock(network_recap_mutex);
+        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, half_size, "Server --> Client");
+        ImGui::SameLine();
+        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, half_size, "Client --> Server");
+    }
+
+    ImGui::PopID();
+    return return_value;
+}
+#endif
 
 void Logger::LogConsume()
 {
@@ -126,6 +355,7 @@ void Logger::LogConsume()
             // Update network recap data
             if (item.bandwidth_bytes > 0)
             {
+                std::scoped_lock lock(network_recap_mutex);
                 const Endpoint simple_origin = SimpleOrigin(item.origin);
                 std::map<std::string, NetworkRecapItem>& recap_data_map = simple_origin == Endpoint::Server ? clientbound_network_recap_data : serverbound_network_recap_data;
 
@@ -138,12 +368,51 @@ void Logger::LogConsume()
                 total_recap_item.bandwidth_bytes += item.bandwidth_bytes;
             }
 
-            const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
-            const bool is_ignored = ignored_set.find(item.msg->GetId()) != ignored_set.end();
-            if (is_ignored)
+            if (log_to_binary_file)
             {
-                continue;
+                std::vector<unsigned char> serialized;
+                WriteData<VarInt>(static_cast<int>(item.connection_state), serialized);
+                WriteData<VarInt>(static_cast<int>(item.origin), serialized);
+                const long long int time_since_epoch = std::chrono::system_clock::to_time_t(item.date);
+                WriteData<VarLong>(static_cast<long long int>(std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count()), serialized);
+                WriteData<VarLong>(static_cast<long long int>(item.bandwidth_bytes), serialized);
+                item.msg->Write(serialized);
+                std::vector<unsigned char> serialized_header;
+                WriteData<bool>(serialized.size() > 256, serialized_header);
+                if (serialized.size() > 256)
+                {
+                    serialized = Compress(serialized);
+                }
+                WriteData<VarInt>(static_cast<int>(serialized.size()), serialized_header);
+                binary_file.write(reinterpret_cast<const char*>(serialized_header.data()), serialized_header.size());
+                binary_file.write(reinterpret_cast<const char*>(serialized.data()), serialized.size());
             }
+
+#ifdef WITH_GUI
+            if (in_gui)
+            {
+                std::scoped_lock<std::mutex> archive_lock(packets_history_mutex);
+                packets_history.push_back(item);
+            }
+#endif
+
+            {
+                std::scoped_lock lock(ignored_packets_mutex);
+                const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
+                const bool is_ignored = ignored_set.find(item.msg->GetId()) != ignored_set.end();
+                if (is_ignored)
+                {
+                    continue;
+                }
+            }
+
+#ifdef WITH_GUI
+            if (in_gui)
+            {
+                std::scoped_lock<std::mutex> archive_lock(packets_history_mutex);
+                packets_history_filtered_indices.push_back(packets_history.size() - 1);
+            }
+#endif
 
             const std::set<int>& detailed_set = detailed_packets[{item.connection_state, SimpleOrigin(item.origin)}];
             const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
@@ -191,7 +460,7 @@ void Logger::LogConsume()
             if (now - last_time_checked_conf_file > 5)
             {
                 last_time_checked_conf_file = now;
-                LoadConfig(logconf_path);
+                LoadConfig();
             }
 
             // Every 10 seconds, print network recap if option is true
@@ -202,110 +471,194 @@ void Logger::LogConsume()
             }
         }
     }
+
+    if (log_file.is_open())
+    {
+        log_file.close();
+    }
+    if (binary_file.is_open())
+    {
+        binary_file.close();
+    }
 }
 
-void Logger::LoadConfig(const std::string& path)
+void Logger::LoadConfig()
 {
-    std::time_t modification_time = GetModifiedTimestamp(path);
+    std::time_t modification_time = Conf::GetModifiedTimestamp();
     if (modification_time == -1 ||
-        modification_time == last_time_conf_file_modified)
+        modification_time == last_time_conf_file_loaded)
     {
         return;
     }
 
-    last_time_conf_file_modified = modification_time;
     std::cout << "Loading updated conf file..." << std::endl;
 
-    std::ifstream file;
-    bool error = path == "";
-    Json::Value json;
-
-    if (!error)
+    Json::Value conf;
     {
-        file.open(path);
-        if (!file.is_open())
-        {
-            std::cerr << "Error trying to open conf file: " << path << "." << std::endl;
-            error = true;
-        }
-        if (!error)
-        {
-            file >> json;
-
-            if (!json.is_object())
-            {
-                std::cerr << "Error parsing conf file at " << path << "." << std::endl;
-                error = true;
-            }
-        }
-        file.close();
-    }
-
-    if (error)
-    {
-        return;
+        std::shared_lock<std::shared_mutex> lock(Conf::conf_mutex);
+        last_time_conf_file_loaded = Conf::GetModifiedTimestamp();
+        conf = Conf::LoadConf();
     }
 
     const std::map<std::string, ConnectionState> name_mapping = {
-        { handshaking_key, ConnectionState::Handshake },
-        { status_key, ConnectionState::Status },
-        { login_key, ConnectionState::Login },
-        { play_key, ConnectionState::Play },
+        { Conf::handshaking_key, ConnectionState::Handshake },
+        { Conf::status_key, ConnectionState::Status },
+        { Conf::login_key, ConnectionState::Login },
+        { Conf::play_key, ConnectionState::Play },
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
-        { configuration_key, ConnectionState::Configuration },
+        { Conf::configuration_key, ConnectionState::Configuration },
 #endif
     };
 
-    log_to_file = true;
+    log_to_file = !conf.contains(Conf::text_file_log_key) || conf[Conf::text_file_log_key].get<bool>();
+    log_to_console = conf.contains(Conf::console_log_key) && conf[Conf::console_log_key].get<bool>();
+    log_network_recap_console = conf.contains(Conf::network_recap_to_console_key) && conf[Conf::network_recap_to_console_key].get<bool>();
+    log_raw_bytes = conf.contains(Conf::raw_bytes_log_key) && conf[Conf::raw_bytes_log_key].get<bool>();
+    log_to_binary_file = conf.contains(Conf::binary_file_log_key) && conf[Conf::binary_file_log_key].get<bool>();
+#ifdef WITH_GUI
+    in_gui = !Conf::headless;
+#endif
 
-    if (json.contains(text_file_log_key) && !json[text_file_log_key].get<bool>())
     {
-        log_to_file = false;
-    }
-
-    log_to_console = false;
-
-    if (!json.contains(console_log_key))
-    {
-        log_to_console = false;
-    }
-    else
-    {
-        log_to_console = json[console_log_key].get<bool>();
-    }
-
-    if (!json.contains(network_recap_to_console_key))
-    {
-        log_network_recap_console = false;
-    }
-    else
-    {
-        log_network_recap_console = json[network_recap_to_console_key].get<bool>();
-    }
-
-    log_raw_bytes = false;
-
-    if (!json.contains(raw_bytes_log_key))
-    {
-        log_raw_bytes = false;
-    }
-    else
-    {
-        log_raw_bytes = json[raw_bytes_log_key].get<bool>();
-    }
-
-    for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
-    {
-        if (json.contains(it->first))
+        std::scoped_lock lock(ignored_packets_mutex);
+        for (auto it = name_mapping.begin(); it != name_mapping.end(); ++it)
         {
-            LoadPacketsFromJson(json[it->first], it->second);
-        }
-        else
-        {
-            LoadPacketsFromJson(Json::Value(), it->second);
+            if (conf.contains(it->first))
+            {
+                LoadPacketsFromJson(conf[it->first], it->second);
+            }
+            else
+            {
+                LoadPacketsFromJson(Json::Value(), it->second);
+            }
         }
     }
+
+#ifdef WITH_GUI
+    // Rewrite filtered packet history with updated ignored lists
+    if (in_gui)
+    {
+        std::scoped_lock archive_lock(packets_history_mutex, ignored_packets_mutex);
+        packets_history_filtered_indices.clear();
+        for (size_t i = 0; i < packets_history.size(); ++i)
+        {
+            const std::set<int>& ignored_set = ignored_packets[{packets_history[i].connection_state, SimpleOrigin(packets_history[i].origin)}];
+            const bool is_ignored = ignored_set.find(packets_history[i].msg->GetId()) != ignored_set.end();
+            if (!is_ignored)
+            {
+                packets_history_filtered_indices.push_back(i);
+            }
+        }
+    }
+#endif
     std::cout << "Conf file loaded!" << std::endl;
+}
+
+int GetIdFromName(const std::string& name, const ConnectionState connection_state, const bool clientbound)
+{
+    if (clientbound)
+    {
+        switch (connection_state)
+        {
+        case ConnectionState::None:
+            return -1;
+        case ConnectionState::Handshake:
+            return -1;
+        case ConnectionState::Status:
+            for (const auto& s : PacketNameIdExtractor<AllClientboundStatusMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+        case ConnectionState::Login:
+            for (const auto& s : PacketNameIdExtractor<AllClientboundLoginMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+        case ConnectionState::Play:
+            for (const auto& s : PacketNameIdExtractor<AllClientboundPlayMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+        case ConnectionState::Configuration:
+            for (const auto& s : PacketNameIdExtractor<AllClientboundConfigurationMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+#endif
+        }
+    }
+    else
+    {
+        switch (connection_state)
+        {
+        case ConnectionState::None:
+            return -1;
+        case ConnectionState::Handshake:
+            for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakeMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+        case ConnectionState::Status:
+            for (const auto& s : PacketNameIdExtractor<AllServerboundStatusMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+        case ConnectionState::Login:
+            for (const auto& s : PacketNameIdExtractor<AllServerboundLoginMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+        case ConnectionState::Play:
+            for (const auto& s : PacketNameIdExtractor<AllServerboundPlayMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+#if PROTOCOL_VERSION > 763 /* > 1.20.1 */
+        case ConnectionState::Configuration:
+            for (const auto& s : PacketNameIdExtractor<AllServerboundConfigurationMessages>::name_ids)
+            {
+                if (s.name == name)
+                {
+                    return s.id;
+                }
+            }
+            return -1;
+#endif
+        }
+    }
 }
 
 void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState connection_state)
@@ -320,9 +673,9 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
         return;
     }
 
-    if (value.contains(ignored_clientbound_key) && value[ignored_clientbound_key].is_array())
+    if (value.contains(Conf::ignored_clientbound_key) && value[Conf::ignored_clientbound_key].is_array())
     {
-        for (const auto& val : value[ignored_clientbound_key].get_array())
+        for (const auto& val : value[Conf::ignored_clientbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -330,23 +683,18 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
             }
             else if (val.is_string())
             {
-                // Search for the matching id
-                for (int j = 0; j < 150; ++j)
+                const int packet_id = GetIdFromName(val.get<std::string>(), connection_state, true);
+                if (packet_id > -1)
                 {
-                    const std::shared_ptr<Message> msg = CreateClientboundMessage(connection_state, j);
-                    if (msg != nullptr && msg->GetName() == val.get<std::string>())
-                    {
-                        ignored_packets[{connection_state, Endpoint::Server}].insert(j);
-                        break;
-                    }
+                    ignored_packets[{connection_state, Endpoint::Server}].insert(packet_id);
                 }
             }
         }
     }
 
-    if (value.contains(ignored_serverbound_key) && value[ignored_serverbound_key].is_array())
+    if (value.contains(Conf::ignored_serverbound_key) && value[Conf::ignored_serverbound_key].is_array())
     {
-        for (const auto& val : value[ignored_serverbound_key].get_array())
+        for (const auto& val : value[Conf::ignored_serverbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -354,23 +702,18 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
             }
             else if (val.is_string())
             {
-                // Search for the matching id
-                for (int j = 0; j < 150; ++j)
+                const int packet_id = GetIdFromName(val.get<std::string>(), connection_state, false);
+                if (packet_id > -1)
                 {
-                    const std::shared_ptr<Message> msg = CreateServerboundMessage(connection_state, j);
-                    if (msg && msg->GetName() == val.get<std::string>())
-                    {
-                        ignored_packets[{connection_state, Endpoint::Client}].insert(j);
-                        break;
-                    }
+                    ignored_packets[{connection_state, Endpoint::Client}].insert(packet_id);
                 }
             }
         }
     }
 
-    if (value.contains(detailed_clientbound_key) && value[detailed_clientbound_key].is_array())
+    if (value.contains(Conf::detailed_clientbound_key) && value[Conf::detailed_clientbound_key].is_array())
     {
-        for (const auto& val : value[detailed_clientbound_key].get_array())
+        for (const auto& val : value[Conf::detailed_clientbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -378,23 +721,18 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
             }
             else if (val.is_string())
             {
-                // Search for the matching id
-                for (int j = 0; j < 150; ++j)
+                const int packet_id = GetIdFromName(val.get<std::string>(), connection_state, true);
+                if (packet_id > -1)
                 {
-                    const std::shared_ptr<Message> msg = CreateClientboundMessage(connection_state, j);
-                    if (msg && msg->GetName() == val.get<std::string>())
-                    {
-                        detailed_packets[{connection_state, Endpoint::Server}].insert(j);
-                        break;
-                    }
+                    ignored_packets[{connection_state, Endpoint::Server}].insert(packet_id);
                 }
             }
         }
     }
 
-    if (value.contains(detailed_serverbound_key) && value[detailed_serverbound_key].is_array())
+    if (value.contains(Conf::detailed_serverbound_key) && value[Conf::detailed_serverbound_key].is_array())
     {
-        for (const auto& val : value[detailed_serverbound_key].get_array())
+        for (const auto& val : value[Conf::detailed_serverbound_key].get_array())
         {
             if (val.is_number())
             {
@@ -402,15 +740,10 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
             }
             else if (val.is_string())
             {
-                // Search for the matching id
-                for (int j = 0; j < 150; ++j)
+                const int packet_id = GetIdFromName(val.get<std::string>(), connection_state, false);
+                if (packet_id > -1)
                 {
-                    const std::shared_ptr<Message> msg = CreateServerboundMessage(connection_state, j);
-                    if (msg && msg->GetName() == val.get<std::string>())
-                    {
-                        detailed_packets[{connection_state, Endpoint::Client}].insert(j);
-                        break;
-                    }
+                    ignored_packets[{connection_state, Endpoint::Client}].insert(packet_id);
                 }
             }
         }
@@ -546,7 +879,7 @@ std::string ReportTable(
         }
         if (clientbound_items[i]->first.size() > clientbound_max_name_length)
         {
-            clientbound_max_name_length = clientbound_items[i]->first.size();
+            clientbound_max_name_length = static_cast<int>(clientbound_items[i]->first.size());
         }
     }
     int serverbound_max_name_length = 0;
@@ -558,7 +891,7 @@ std::string ReportTable(
         }
         if (serverbound_items[i]->first.size() > serverbound_max_name_length)
         {
-            serverbound_max_name_length = serverbound_items[i]->first.size();
+            serverbound_max_name_length = static_cast<int>(serverbound_items[i]->first.size());
         }
     }
 
@@ -891,6 +1224,7 @@ std::string ReportTable(
 
 std::string Logger::GenerateNetworkRecap(const int max_entry, const int max_name_size) const
 {
+    std::scoped_lock lock(network_recap_mutex);
     std::vector<map_it> clientbound_recap_iterators_sorted_count;
     std::vector<map_it> clientbound_recap_iterators_sorted_size;
     clientbound_recap_iterators_sorted_count.reserve(clientbound_network_recap_data.size());
@@ -955,3 +1289,234 @@ std::string Logger::GenerateNetworkRecap(const int max_entry, const int max_name
 
     return output.str();
 }
+
+#ifdef WITH_GUI
+void RenderJson(const Json::Value& json, const int indent_level)
+{
+    std::string indent_string = "";
+    for (int i = 0; i < indent_level; ++i)
+    {
+        indent_string += "  ";
+    }
+
+    if (json.is_object())
+    {
+        ImGui::TextUnformatted("{");
+        size_t index = 0;
+        for (const auto& [k, v] : json.get_object())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.5f, 1.0f));
+            ImGui::Text((indent_string + "  \"" + k + "\": ").c_str());
+            ImGui::PopStyleColor();
+            ImGui::SameLine(0.0f, 0.0f);
+            RenderJson(v, indent_level + 1);
+            index += 1;
+            if (index < json.size())
+            {
+                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::TextUnformatted(",");
+            }
+        }
+        ImGui::TextUnformatted((indent_string + "}").c_str());
+    }
+    else if (json.is_array())
+    {
+        ImGui::TextUnformatted("[");
+        size_t index = 0;
+        for (const auto& v : json.get_array())
+        {
+            ImGui::Text((indent_string + "  ").c_str());
+            ImGui::SameLine(0.0f, 0.0f);
+            RenderJson(v, indent_level + 1);
+            index += 1;
+            if (index < json.size())
+            {
+                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::TextUnformatted(",");
+            }
+        }
+        ImGui::TextUnformatted((indent_string + "]").c_str());
+    }
+    else if (json.is_null())
+    {
+        ImGui::TextUnformatted("{ }");
+    }
+    else if (json.is_string())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.75f, 1.0f, 1.0f));
+        ImGui::Text(('"' + json.get_string() + '"').c_str());
+        ImGui::PopStyleColor();
+    }
+    else if (json.is<unsigned long long int>())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
+        ImGui::Text(std::to_string(json.get_number<unsigned long long int>()).c_str());
+        ImGui::PopStyleColor();
+    }
+    else if (json.is<long long int>())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
+        ImGui::Text(std::to_string(json.get_number<long long int>()).c_str());
+        ImGui::PopStyleColor();
+    }
+    else if (json.is_number())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
+        ImGui::Text(std::to_string(json.get_number()).c_str());
+        ImGui::PopStyleColor();
+    }
+    else if (json.is_bool())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.75f, 1.0f));
+        ImGui::Text((json.get<bool>() ? "true" : "false"));
+        ImGui::PopStyleColor();
+    }
+}
+
+void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title)
+{
+    char buffer_count[30];
+    char buffer_bandwidth[30];
+
+    if (ImGui::BeginTable(table_title.c_str(), 3,
+        ImGuiTableFlags_Sortable | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter |
+        ImGuiTableFlags_BordersV | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SortTristate,
+        ImVec2(width, 0.0f))
+    )
+    {
+        ImGui::TableSetupColumn(table_title.c_str(), ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
+        ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed, 0.0f, 1);
+        ImGui::TableSetupColumn("Bandwidth", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed, 0.0f, 2);
+
+        ImGui::TableSetupScrollFreeze(0, 2);
+        ImGui::TableHeadersRow();
+
+        // Always display total line first
+        ImGui::PushID("total");
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted("Total");
+        ImGui::TableNextColumn();
+        std::sprintf(buffer_count, "%llu (%6.2f%%)", total.count, 100.0f);
+        // Right align in the column
+        ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_count).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
+        ImGui::SameLine();
+        ImGui::TextUnformatted(buffer_count);
+        ImGui::TableNextColumn();
+        std::sprintf(buffer_bandwidth, "%llu (%6.2f%%)", total.bandwidth_bytes, 100.0f);
+        // Right align in the column
+        ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_bandwidth).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
+        ImGui::SameLine();
+        ImGui::TextUnformatted(buffer_bandwidth);
+        ImGui::PopID();
+
+        // Sort all the other lines
+        std::vector<map_it> sorted_iterators;
+        sorted_iterators.reserve(data.size());
+        for (auto it = data.cbegin(); it != data.cend(); ++it)
+        {
+            sorted_iterators.push_back(it);
+        }
+        // Don't check SpecsDirty as new rows could be added/values could be updated
+        if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs())
+        {
+            // If sort spec array is > 0, sort according to asked column
+            if (specs->SpecsCount > 0)
+            {
+                // Sort on name
+                if (specs->Specs[0].ColumnUserID == 0)
+                {
+                    if (specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
+                    {
+                        std::sort(sorted_iterators.begin(), sorted_iterators.end(), [&](const map_it& a, const map_it& b)
+                            {
+                                return a->first < b->first;
+                            });
+                    }
+                    else if (specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
+                    {
+                        std::sort(sorted_iterators.begin(), sorted_iterators.end(), [&](const map_it& a, const map_it& b)
+                            {
+                                return a->first > b->first;
+                            });
+                    }
+                }
+                // Sort on count
+                else if (specs->Specs[0].ColumnUserID == 1)
+                {
+                    if (specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
+                    {
+                        std::sort(sorted_iterators.begin(), sorted_iterators.end(), [&](const map_it& a, const map_it& b)
+                            {
+                                return a->second.count < b->second.count;
+                            });
+                    }
+                    else if (specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
+                    {
+                        std::sort(sorted_iterators.begin(), sorted_iterators.end(), [&](const map_it& a, const map_it& b)
+                            {
+                                return a->second.count > b->second.count;
+                            });
+                    }
+                }
+                // Sort on bandwidth
+                else if (specs->Specs[0].ColumnUserID == 2)
+                {
+                    if (specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
+                    {
+                        std::sort(sorted_iterators.begin(), sorted_iterators.end(), [&](const map_it& a, const map_it& b)
+                            {
+                                return a->second.bandwidth_bytes < b->second.bandwidth_bytes;
+                            });
+                    }
+                    else if (specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
+                    {
+                        std::sort(sorted_iterators.begin(), sorted_iterators.end(), [&](const map_it& a, const map_it& b)
+                            {
+                                return a->second.bandwidth_bytes > b->second.bandwidth_bytes;
+                            });
+                    }
+                }
+            }
+            specs->SpecsDirty = false;
+        }
+
+        // Draw the rows
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(sorted_iterators.size()));
+        while (clipper.Step())
+        {
+            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+            {
+                const auto& it = sorted_iterators[i];
+                ImGui::PushID(it->first.c_str());
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(it->first.c_str());
+                if (ImGui::IsItemHovered() && ImGui::CalcTextSize(it->first.c_str()).x > ImGui::GetColumnWidth() && ImGui::BeginTooltip())
+                {
+                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+                    ImGui::TextUnformatted(it->first.c_str());
+                    ImGui::PopTextWrapPos();
+                    ImGui::EndTooltip();
+                }
+                ImGui::TableNextColumn();
+                std::sprintf(buffer_count, "%llu (%6.2f%%)", it->second.count, (100.0f * it->second.count) / total.count);
+                // Right align in the column
+                ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_count).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
+                ImGui::SameLine();
+                ImGui::TextUnformatted(buffer_count);
+                ImGui::TableNextColumn();
+                std::sprintf(buffer_bandwidth, "%llu (%6.2f%%)", it->second.bandwidth_bytes, (100.0f * it->second.bandwidth_bytes) / total.bandwidth_bytes);
+                // Right align in the column
+                ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_bandwidth).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
+                ImGui::SameLine();
+                ImGui::TextUnformatted(buffer_bandwidth);
+                ImGui::PopID();
+            }
+        }
+
+        ImGui::EndTable();
+    }
+}
+#endif

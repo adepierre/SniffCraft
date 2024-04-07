@@ -7,9 +7,10 @@
 
 using namespace ProtocolCraft;
 
-ReplayModLogger::ReplayModLogger(const std::string &conf_path)
+ReplayModLogger::ReplayModLogger()
 {
-    TryStart(conf_path);
+    is_running = true;
+    log_thread = std::thread(&ReplayModLogger::LogConsume, this);
 }
 
 ReplayModLogger::~ReplayModLogger()
@@ -101,47 +102,6 @@ void ReplayModLogger::LogConsume()
                 replay_file.write((char*)packet.data(), packet.size());
             }
         }
-    }
-}
-
-void ReplayModLogger::TryStart(const std::string& conf_path)
-{
-    std::ifstream file;
-
-    bool error = conf_path == "";
-    Json::Value json;
-
-    if (!error)
-    {
-        file.open(conf_path);
-        if (!file.is_open())
-        {
-            std::cerr << "Error trying to open conf file: " << conf_path << "." << std::endl;
-            error = true;
-        }
-        if (!error)
-        {
-            file >> json;
-            file.close();
-
-            if (!json.is_object())
-            {
-                std::cerr << "Error parsing conf file at " << conf_path << "." << std::endl;
-                error = true;
-            }
-        }
-    }
-
-    //Create default conf
-    if (error)
-    {
-        return;
-    }
-
-    if (json.contains("LogToReplay") && json["LogToReplay"].get<bool>())
-    {
-        is_running = true;
-        log_thread = std::thread(&ReplayModLogger::LogConsume, this);
     }
 }
 

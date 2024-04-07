@@ -24,7 +24,9 @@ public:
     MinecraftProxy(asio::io_context& io_context);
     virtual ~MinecraftProxy();
 
-    virtual void Start(const std::string& server_address, const unsigned short server_port, const std::string& conf_path) override;
+    virtual void Start(const std::string& server_address, const unsigned short server_port) override;
+
+    std::shared_ptr<Logger> GetLogger() const;
 
 protected:
     virtual size_t ProcessData(const std::vector<unsigned char>::const_iterator& data, const size_t length, const Endpoint source) override;
@@ -62,7 +64,7 @@ private:
 #endif
 
 private:
-    std::unique_ptr<Logger> logger;
+    std::shared_ptr<Logger> logger;
     std::unique_ptr<ReplayModLogger> replay_logger;
 
     ProtocolCraft::ConnectionState connection_state;
