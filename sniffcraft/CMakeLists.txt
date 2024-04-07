@@ -7,12 +7,12 @@ set(sniffcraft_PUBLIC_HDR
     include/sniffcraft/Connection.hpp
     include/sniffcraft/DataProcessor.hpp
     include/sniffcraft/enums.hpp
-    include/sniffcraft/FileUtilities.hpp
     include/sniffcraft/Logger.hpp
     include/sniffcraft/LogItem.hpp
     include/sniffcraft/MinecraftEncryptionDataProcessor.hpp
     include/sniffcraft/MinecraftProxy.hpp
     include/sniffcraft/NetworkRecapItem.hpp
+    include/sniffcraft/PacketUtilities.hpp
     include/sniffcraft/ReplayModLogger.hpp
     include/sniffcraft/server.hpp
 
@@ -35,8 +35,8 @@ set(sniffcraft_PUBLIC_HDR
 set(sniffcraft_SRC
     src/BaseProxy.cpp
     src/Compression.cpp
+    src/conf.cpp
     src/Connection.cpp
-    src/FileUtilities.cpp
     src/Logger.cpp
     src/MinecraftEncryptionDataProcessor.cpp
     src/MinecraftProxy.cpp
@@ -75,51 +75,56 @@ if(MSVC)
     endforeach()
 endif()
 
-add_executable(sniffcraft ${sniffcraft_SRC} ${sniffcraft_PUBLIC_HDR})
-set_property(TARGET sniffcraft PROPERTY CXX_STANDARD 17)
-set_target_properties(sniffcraft PROPERTIES DEBUG_POSTFIX "_d")
-set_target_properties(sniffcraft PROPERTIES RELWITHDEBINFO_POSTFIX "_rd")
+add_executable(${PROJECT_NAME} ${sniffcraft_SRC} ${sniffcraft_PUBLIC_HDR})
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX "_d")
+set_target_properties(${PROJECT_NAME} PROPERTIES RELWITHDEBINFO_POSTFIX "_rd")
 
 if(MSVC)
     # To avoid having folder for each configuration when building with Visual
-    set_target_properties(sniffcraft PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/lib")
-    set_target_properties(sniffcraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/lib")
-    set_target_properties(sniffcraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/lib")
-    set_target_properties(sniffcraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/lib")
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/lib")
+    set_target_properties(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/lib")
+    set_target_properties(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/lib")
+    set_target_properties(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/lib")
 else()
-    set_target_properties(sniffcraft PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
-    set_target_properties(sniffcraft PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib")
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+    set_target_properties(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib")
 endif(MSVC)
 
-target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include")
-target_include_directories(sniffcraft PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/include")
+target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include")
+target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/include")
 
 # Add Asio
-target_link_libraries(sniffcraft PUBLIC asio)
-target_compile_definitions(sniffcraft PUBLIC ASIO_STANDALONE)
+target_link_libraries(${PROJECT_NAME} PUBLIC asio)
+target_compile_definitions(${PROJECT_NAME} PUBLIC ASIO_STANDALONE)
 
 # Add Zlib
-target_link_libraries(sniffcraft PUBLIC ZLIB::ZLIB)
+target_link_libraries(${PROJECT_NAME} PUBLIC ZLIB::ZLIB)
 
 # Add OpenSSL
 if(SNIFFCRAFT_WITH_ENCRYPTION)
-    target_link_libraries(sniffcraft PUBLIC OpenSSL::SSL)
-    target_link_libraries(sniffcraft PUBLIC OpenSSL::Crypto)
-    target_compile_definitions(sniffcraft PUBLIC USE_ENCRYPTION=1)
+    target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::SSL)
+    target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC USE_ENCRYPTION=1)
 endif(SNIFFCRAFT_WITH_ENCRYPTION)
 
 # Add threads support
-target_link_libraries(sniffcraft PUBLIC Threads::Threads)
+target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads)
 
 # Add protocolCraft
-target_link_libraries(sniffcraft PUBLIC protocolCraft)
+target_link_libraries(${PROJECT_NAME} PUBLIC protocolCraft)
+
+if (SNIFFCRAFT_WITH_GUI)
+	target_link_libraries(${PROJECT_NAME} PRIVATE glfw ${OPENGL_LIBRARIES} glad imgui)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE WITH_GUI)
+endif()

@@ -1,22 +1,33 @@
 #include <iostream>
+#include <string_view>
+#include "sniffcraft/conf.hpp"
 #include "sniffcraft/server.hpp"
 
 int main(int argc, char* argv[])
 {
    if (argc < 1)
    {
-      std::cerr << "usage: sniffcraft <optional:conf_path>" << std::endl;
+      std::cerr << "usage: sniffcraft <optional:--headless> <optional:conf_path>" << std::endl;
    }
 
-   std::string conf_path = "";
    if (argc > 1)
    {
-       conf_path = argv[1];
+       for (int i = 1; i < argc; ++i)
+       {
+           if (std::string_view(argv[i]) == "--headless")
+           {
+               Conf::headless = true;
+           }
+           else
+           {
+               Conf::conf_path = argv[i];
+           }
+       }
    }
 
    try
    {
-       Server server = Server(conf_path);
+       Server server = Server();
        server.run();
    }
    catch(std::exception& e)

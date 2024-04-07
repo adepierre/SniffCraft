@@ -8,9 +8,11 @@
 #include <protocolCraft/Message.hpp>
 #include <protocolCraft/Utilities/Json.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -22,13 +24,23 @@
 class Logger
 {
 public:
-    Logger(const std::string &conf_path);
+    Logger();
+#ifdef WITH_GUI
+    Logger(const std::filesystem::path& path);
+#endif
     ~Logger();
     void Log(const std::shared_ptr<ProtocolCraft::Message>& msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes);
+    const std::string& GetBaseFilename() const;
+    void LoadConfig();
+    void Stop();
+#ifdef WITH_GUI
+    /// @brief Render this Logger packets
+    /// @return A tuple <message, connection state, origin> to add to ignored, if first element is nullptr, nothing to add
+    std::tuple<std::shared_ptr<ProtocolCraft::Message>, ProtocolCraft::ConnectionState, Endpoint> Render();
+#endif
 
 private:
     void LogConsume();
-    void LoadConfig(const std::string& path);
     void LoadPacketsFromJson(const ProtocolCraft::Json::Value& value, const ProtocolCraft::ConnectionState connection_state);
     std::string_view OriginToString(const Endpoint origin) const;
     std::string_view ConnectionStateToString(const ProtocolCraft::ConnectionState connection_state) const;
@@ -47,23 +59,38 @@ private:
     std::condition_variable log_condition;
     std::queue<LogItem> logging_queue;
 
-    std::string logconf_path;
+    std::string base_filename;
     std::ofstream log_file;
-    bool is_running;
+    std::ofstream binary_file;
+    std::atomic<bool> is_running;
     bool log_to_file;
+    bool log_to_binary_file;
     bool log_to_console;
     bool log_raw_bytes;
     bool log_network_recap_console;
+#ifdef WITH_GUI
+    bool in_gui;
+#endif
 
     std::time_t last_time_checked_conf_file;
-    std::time_t last_time_conf_file_modified;
+    std::time_t last_time_conf_file_loaded;
     std::time_t last_time_network_recap_printed;
 
     std::map<std::pair<ProtocolCraft::ConnectionState, Endpoint>, std::set<int> > ignored_packets;
+    std::mutex ignored_packets_mutex;
     std::map<std::pair<ProtocolCraft::ConnectionState, Endpoint>, std::set<int> > detailed_packets;
 
     std::map<std::string, NetworkRecapItem> clientbound_network_recap_data;
     std::map<std::string, NetworkRecapItem> serverbound_network_recap_data;
+    mutable std::mutex network_recap_mutex;
     NetworkRecapItem clientbound_total_network_recap;
     NetworkRecapItem serverbound_total_network_recap;
+
+#ifdef WITH_GUI
+    std::vector<LogItem> packets_history;
+    std::vector<size_t> packets_history_filtered_indices;
+    std::mutex packets_history_mutex;
+    long long int selected_index = -1;
+    ProtocolCraft::Json::Value selected_json;
+#endif
 };

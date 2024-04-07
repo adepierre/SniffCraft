@@ -1,26 +1,37 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13)
 
 project(SniffCraft)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(SNIFFCRAFT_WITH_ENCRYPTION "Activate for online mode support" ON)
+option(SNIFFCRAFT_WITH_GUI "Activate for GUI support" ON)
 option(SNIFFCRAFT_FORCE_LOCAL_ZLIB "Force using a local install of zlib even if already present on the system" OFF)
 option(SNIFFCRAFT_FORCE_LOCAL_OPENSSL "Force using a local install of openSSL even if already present on the system" OFF)
 
 # Add Asio
-include("${CMAKE_SOURCE_DIR}/cmake/asio.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/asio.cmake")
 
 # Add Zlib
-include("${CMAKE_SOURCE_DIR}/cmake/zlib.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/zlib.cmake")
 
 # Add OpenSSL
 if(SNIFFCRAFT_WITH_ENCRYPTION)
-    include("${CMAKE_SOURCE_DIR}/cmake/openssl.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/openssl.cmake")
 endif(SNIFFCRAFT_WITH_ENCRYPTION)
 
 # Add ProtocolCraft
-include("${CMAKE_SOURCE_DIR}/cmake/botcraft.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/botcraft.cmake")
+
+# Add GUI related dependencies
+if(SNIFFCRAFT_WITH_GUI)
+    set(FETCHCONTENT_QUIET TRUE)
+    include(FetchContent)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/glad.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/opengl.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/glfw.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/imgui.cmake")
+endif(SNIFFCRAFT_WITH_GUI)
 
 # Check pthreads
 find_package(Threads)

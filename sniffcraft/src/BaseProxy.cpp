@@ -21,7 +21,7 @@ BaseProxy::~BaseProxy()
     }
 }
 
-void BaseProxy::Start(const std::string& server_address, const unsigned short server_port, const std::string& conf_path)
+void BaseProxy::Start(const std::string& server_address, const unsigned short server_port)
 {
     std::cout << "Starting new proxy to " << server_address << ":" << server_port << std::endl;
     server_ip_ = server_address;

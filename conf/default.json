@@ -1,12 +1,12 @@
 {
     "ServerAddress": "127.0.0.1:25565",
-    "LocalPort": 8686,
+    "LocalPort": 25555,
     "LogToTxtFile": true,
-    "LogToConsole": false,
+    "LogToBinFile": false,
+    "LogToConsole": true,
     "LogToReplay": false,
     "LogRawBytes": false,
     "Online": false,
-    "Headless": false,
     "NetworkRecapToConsole": false,
     "MicrosoftAccountCacheKey": "",
     "Handshaking": {

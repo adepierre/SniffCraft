@@ -73,6 +73,7 @@ private:
 
 	/// @brief Thread running the sync writing loop
 	std::thread write_thread;
+	std::atomic<bool> write_thread_started;
 	/// @brief A deque of data to send. If second parameter bool is set to true, means that we need to apply data_processor to it before sending
 	std::deque<std::pair<std::vector<unsigned char>, bool>> data_to_write;
 	/// @brief mutex protecting data_to_write
