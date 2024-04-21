@@ -152,84 +152,93 @@ void BaseProxy::ReadIncomingData()
             break;
         }
 
-        while (!data_sources.empty())
+        try
         {
-            Endpoint data_source = Endpoint::Server;
-            // Retrieve the origin of the data, but don't remove it in case we need
-            // to wait for more data to get a full packet
+            while (!data_sources.empty())
             {
-                std::lock_guard<std::mutex> data_source_lock(data_sources_mutex);
-                data_source = data_sources.front().first;
-            }
-
-            // Process the data coming from this endpoint
-            Connection& src_connection = data_source == Endpoint::Server ? server_connection : client_connection;
-            std::vector<unsigned char>& received_data = data_source == Endpoint::Server ? server_received_data : client_received_data;
-            // Read all new data from this connection
-            src_connection.RetreiveData(received_data);
-
-            // Do something with the data
-            size_t data_to_remove = ProcessData(received_data.cbegin(), received_data.size(), data_source);
-
-            if (data_to_remove == 0)
-            {
-                continue;
-            }
-
-            if (data_to_remove > received_data.size())
-            {
-                std::cerr << "Warning, asked to remove more data than possible" << std::endl;
-                data_to_remove = received_data.size();
-            }
-
-            // Remove the data from the buffer
-            received_data.erase(received_data.begin(), received_data.begin() + data_to_remove);
-
-            // Remove all data_sources elements that refers to data we already removed
-            {
-                std::lock_guard<std::mutex> data_source_lock(data_sources_mutex);
-                std::list<std::pair<Endpoint, size_t>>::iterator it = data_sources.begin();
-                size_t already_removed = 0;
-                while (it != data_sources.end())
+                Endpoint data_source = Endpoint::Server;
+                // Retrieve the origin of the data, but don't remove it in case we need
+                // to wait for more data to get a full packet
                 {
-                    // If this is from the endpoint we processed
-                    if (it->first == data_source)
+                    std::lock_guard<std::mutex> data_source_lock(data_sources_mutex);
+                    data_source = data_sources.front().first;
+                }
+
+                // Process the data coming from this endpoint
+                Connection& src_connection = data_source == Endpoint::Server ? server_connection : client_connection;
+                std::vector<unsigned char>& received_data = data_source == Endpoint::Server ? server_received_data : client_received_data;
+                // Read all new data from this connection
+                src_connection.RetreiveData(received_data);
+
+                // Do something with the data
+                size_t data_to_remove = ProcessData(received_data.cbegin(), received_data.size(), data_source);
+
+                if (data_to_remove == 0)
+                {
+                    continue;
+                }
+
+                if (data_to_remove > received_data.size())
+                {
+                    std::cerr << "Warning, asked to remove more data than possible" << std::endl;
+                    data_to_remove = received_data.size();
+                }
+
+                // Remove the data from the buffer
+                received_data.erase(received_data.begin(), received_data.begin() + data_to_remove);
+
+                // Remove all data_sources elements that refers to data we already removed
+                {
+                    std::lock_guard<std::mutex> data_source_lock(data_sources_mutex);
+                    std::list<std::pair<Endpoint, size_t>>::iterator it = data_sources.begin();
+                    size_t already_removed = 0;
+                    while (it != data_sources.end())
                     {
-                        // If we cleared all the data from this update, remove this entry
-                        // as it's fully processed, and increment the iterator to next item
-                        if (already_removed + it->second <= data_to_remove)
+                        // If this is from the endpoint we processed
+                        if (it->first == data_source)
                         {
-                            already_removed += it->second;
-                            data_sources.erase(it++);
+                            // If we cleared all the data from this update, remove this entry
+                            // as it's fully processed, and increment the iterator to next item
+                            if (already_removed + it->second <= data_to_remove)
+                            {
+                                already_removed += it->second;
+                                data_sources.erase(it++);
+                            }
+                            // We only used part of the data from this update, so set it's new size
+                            else
+                            {
+                                it->second = it->second - (data_to_remove - already_removed);
+                                already_removed = data_to_remove;
+                            }
+
+                            // If we removed the right amount of elements, we can stop iterating the list
+                            if (already_removed == data_to_remove)
+                            {
+                                break;
+                            }
                         }
-                        // We only used part of the data from this update, so set it's new size
                         else
                         {
-                            it->second = it->second - (data_to_remove - already_removed);
-                            already_removed = data_to_remove;
+                            ++it;
                         }
-
-                        // If we removed the right amount of elements, we can stop iterating the list
-                        if (already_removed == data_to_remove)
-                        {
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        ++it;
                     }
                 }
-            }
 
-            if (server_connection.Closed())
-            {
-                client_connection.Close();
+                if (server_connection.Closed())
+                {
+                    client_connection.Close();
+                }
+                if (client_connection.Closed())
+                {
+                    server_connection.Close();
+                }
             }
-            if (client_connection.Closed())
-            {
-                server_connection.Close();
-            }
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Exception when reading the data: " << e.what() << std::endl;
+            client_connection.Close();
+            server_connection.Close();
         }
     }
 }

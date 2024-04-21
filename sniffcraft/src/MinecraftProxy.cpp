@@ -306,7 +306,8 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
     {
         std::cerr << "WARNING, trying to connect to a server with encryption enabled\n"
             << "but impossible without being authenticated.\n"
-            << "Try changing Online to true in sniffcraft conf json file"
+            << "Try changing Online to true in sniffcraft conf json file\n"
+            << "or check Authenticated in the GUI\n"
             << std::endl;
         throw std::runtime_error("Not authenticated");
     }
