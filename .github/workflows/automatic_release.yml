@@ -73,7 +73,7 @@ jobs:
 
       - name: Create release note
         run: |
-            echo Automatically generated binaries with GUI support for Minecraft ${{ steps.mc-version.outputs.content }}. > release_note.txt
+            echo Automatically generated binaries with GUI support for Minecraft ${{ steps.mc-version.outputs.version }}. > release_note.txt
             echo -en '\n' >> release_note.txt
             echo "Examples of conf files can be found [here](https://github.com/${{ github.repository }}/tree/master/conf)." >> release_note.txt
             echo -en '\n' >> release_note.txt
