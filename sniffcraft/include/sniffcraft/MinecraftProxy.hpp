@@ -54,7 +54,11 @@ private:
 #if USE_ENCRYPTION && PROTOCOL_VERSION > 760 /* > 1.19.1/2 */
     virtual void Handle(ProtocolCraft::ClientboundLoginPacket& msg) override;
     virtual void Handle(ProtocolCraft::ServerboundChatPacket& msg) override;
+#if PROTOCOL_VERSION < 766 /* < 1.20.5 */
     virtual void Handle(ProtocolCraft::ServerboundChatCommandPacket& msg) override;
+#else
+    virtual void Handle(ProtocolCraft::ServerboundChatCommandSignedPacket& msg) override;
+#endif
     virtual void Handle(ProtocolCraft::ClientboundPlayerChatPacket& msg) override;
 #endif
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */

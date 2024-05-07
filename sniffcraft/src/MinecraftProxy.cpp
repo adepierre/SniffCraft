@@ -451,7 +451,11 @@ void MinecraftProxy::Handle(ServerboundChatPacket& msg)
     logger->Log(replacement_chat_packet, connection_state, Endpoint::SniffcraftToServer, 0);
 }
 
+#if PROTOCOL_VERSION < 766 /* < 1.20.5 */
 void MinecraftProxy::Handle(ServerboundChatCommandPacket& msg)
+#else
+void MinecraftProxy::Handle(ServerboundChatCommandSignedPacket& msg)
+#endif
 {
     if (authentifier == nullptr)
     {
@@ -460,7 +464,11 @@ void MinecraftProxy::Handle(ServerboundChatCommandPacket& msg)
 
     transmit_original_packet = false;
 
+#if PROTOCOL_VERSION < 766 /* < 1.20.5 */
     std::shared_ptr<ServerboundChatCommandPacket> replacement_chat_command = std::make_shared<ServerboundChatCommandPacket>();
+#else
+    std::shared_ptr<ServerboundChatCommandSignedPacket> replacement_chat_command = std::make_shared<ServerboundChatCommandSignedPacket>();
+#endif
     replacement_chat_command->SetCommand(msg.GetCommand());
     replacement_chat_command->SetTimestamp(msg.GetTimestamp());
     replacement_chat_command->SetSalt(msg.GetSalt());

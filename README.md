@@ -20,7 +20,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.20.4
+- Supported minecraft versions: all official releases from 1.12.2 to 1.20.6
 - GUI mode
 - Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
 - Detailed network usage recap
@@ -33,6 +33,8 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Save full session to binary file and reopen them later in the GUI
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
 - No log at all is possible, in this case, SniffCraft becomes a pure proxy that you can adapt to block/modify any packet you want
+
+1.20.5 transfer packet is **not** supported yet.
 
 <img width="600" src="https://github.com/adepierre/SniffCraft/assets/24371370/8c6b04d3-61e6-4fdc-aa1e-7e9505ac6033" alt="Sniffcraft GUI" align="center">
 
