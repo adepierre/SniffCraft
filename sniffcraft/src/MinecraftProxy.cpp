@@ -123,6 +123,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
         }
         catch (const std::exception& ex)
         {
+            std::cout << msg->GetName() << std::endl;
             std::cout << ((source == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
                 "PARSING EXCEPTION for message " << msg->GetName() << "(: " << minecraft_id << ")" << ex.what() << std::endl;
             error_parsing = true;
