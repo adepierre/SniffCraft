@@ -726,7 +726,7 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
                 const int packet_id = GetIdFromName(val.get<std::string>(), connection_state, true);
                 if (packet_id > -1)
                 {
-                    ignored_packets[{connection_state, Endpoint::Server}].insert(packet_id);
+                    detailed_packets[{connection_state, Endpoint::Server}].insert(packet_id);
                 }
             }
         }
@@ -745,7 +745,7 @@ void Logger::LoadPacketsFromJson(const Json::Value& value, const ConnectionState
                 const int packet_id = GetIdFromName(val.get<std::string>(), connection_state, false);
                 if (packet_id > -1)
                 {
-                    ignored_packets[{connection_state, Endpoint::Client}].insert(packet_id);
+                    detailed_packets[{connection_state, Endpoint::Client}].insert(packet_id);
                 }
             }
         }
