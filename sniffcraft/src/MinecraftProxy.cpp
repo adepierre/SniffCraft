@@ -123,7 +123,6 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
         }
         catch (const std::exception& ex)
         {
-            std::cout << msg->GetName() << std::endl;
             std::cout << ((source == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
                 "PARSING EXCEPTION for message " << msg->GetName() << "(: " << minecraft_id << ")" << ex.what() << std::endl;
             error_parsing = true;
@@ -260,7 +259,7 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
 #if PROTOCOL_VERSION < 759 /* < 1.19 */
     replacement_hello_packet->SetGameProfile(authentifier->GetPlayerDisplayName());
 #else
-    replacement_hello_packet->SetName(authentifier->GetPlayerDisplayName());
+    replacement_hello_packet->SetName_(authentifier->GetPlayerDisplayName());
 
 #if PROTOCOL_VERSION < 761 /* < 1.19.3 */
     ProfilePublicKey key;
@@ -336,7 +335,7 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
         raw_shared_secret, encrypted_shared_secret, encrypted_challenge);
 #endif
 
-    authentifier->JoinServer(msg.GetServerID(), raw_shared_secret, msg.GetPublicKey());
+    authentifier->JoinServer(msg.GetServerId(), raw_shared_secret, msg.GetPublicKey());
 
     std::shared_ptr<ServerboundKeyPacket> response_msg = std::make_shared<ServerboundKeyPacket>();
     response_msg->SetKeyBytes(encrypted_shared_secret);
@@ -396,7 +395,7 @@ void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
     {
         chat_session_uuid[i] = static_cast<unsigned char>(distrib(rnd));
     }
-    chat_session_data.SetUUID(chat_session_uuid);
+    chat_session_data.SetUuid(chat_session_uuid);
 
     chat_session_msg->SetChatSession(chat_session_data);
     std::vector<unsigned char> chat_session_msg_bytes = PacketToBytes(*chat_session_msg);
@@ -491,7 +490,7 @@ void MinecraftProxy::Handle(ClientboundPlayerChatPacket& msg)
 
     if (msg.GetSignature().has_value())
     {
-        chat_context.AddSeenMessage(msg.GetSignature().value());
+        chat_context.AddSeenMessage(std::vector<unsigned char>(msg.GetSignature().value().begin(), msg.GetSignature().value().end()));
 
         if (chat_context.GetOffset() > 64)
         {
