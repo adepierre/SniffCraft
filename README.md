@@ -20,7 +20,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 ## Features
 
-- Supported minecraft versions: all official releases from 1.12.2 to 1.20.6
+- Supported minecraft versions: all official releases from 1.12.2 to 1.21
 - GUI mode
 - Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
 - Detailed network usage recap
