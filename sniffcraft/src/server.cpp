@@ -197,7 +197,7 @@ void Server::ResolveIpPortFromAddress()
     }
     std::cout << "SRV DNS lookup failed to find an address" << std::endl;
 
-    // If we are here either the port was given or the SRV failed 
+    // If we are here either the port was given or the SRV failed
     // In both cases we need to assume the given address is the correct one
     server_port = (server_port == 0) ? 25565 : server_port;
     server_ip = addressOnly;
@@ -865,8 +865,10 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 std::scoped_lock<std::mutex> lock(loggers_mutex);
                 if (loggers.size() > 0 && ImGui::BeginTabBar("loggers", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
                 {
+                    int index = 0;
                     for (auto it = loggers.begin(); it != loggers.end(); )
                     {
+                        ImGui::PushID(index);
                         bool open = true;
                         if (ImGui::BeginTabItem((*it)->GetBaseFilename().c_str(), &open, ImGuiTabItemFlags_None))
                         {
@@ -880,12 +882,14 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                         }
                         if (!open)
                         {
-                            loggers.erase(it);
+                            it = loggers.erase(it);
                         }
                         else
                         {
                             ++it;
                         }
+                        index += 1;
+                        ImGui::PopID();
                     }
                     ImGui::EndTabBar();
                 }
