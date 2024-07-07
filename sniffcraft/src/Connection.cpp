@@ -35,19 +35,19 @@ void Connection::RetreiveData(std::vector<unsigned char>& dst)
 
 void Connection::StartListeningAndWriting()
 {
-    timeout_timer.expires_from_now(std::chrono::seconds(10));
-    timeout_timer.async_wait(
-        std::bind(&Connection::handle_timeout, this, std::placeholders::_1)
-    );
-    socket.async_read_some(asio::buffer(read_buffer.data(), BUFFER_SIZE),
-        std::bind(&Connection::handle_read, this,
-            std::placeholders::_1, std::placeholders::_2));
     write_thread_started = false;
     write_thread = std::thread(&Connection::WriteLoop, this);
     while (!write_thread_started)
     {
 
     }
+    timeout_timer.expires_from_now(std::chrono::seconds(15));
+    timeout_timer.async_wait(
+        std::bind(&Connection::handle_timeout, this, std::placeholders::_1)
+    );
+    socket.async_read_some(asio::buffer(read_buffer.data(), BUFFER_SIZE),
+        std::bind(&Connection::handle_read, this,
+            std::placeholders::_1, std::placeholders::_2));
 }
 
 void Connection::WriteData(const unsigned char* const data, const size_t length)
@@ -125,7 +125,7 @@ void Connection::WriteLoop()
             asio::write(socket, asio::buffer(data_ptr, data_length), ec);
             if (ec)
             {
-                Close();
+                closed = true;
                 return;
             }
         }
@@ -141,7 +141,7 @@ void Connection::handle_read(const asio::error_code& ec, const size_t bytes_tran
 
     if (ec)
     {
-        Close();
+        closed = true;
         return;
     }
 
@@ -170,7 +170,7 @@ void Connection::handle_read(const asio::error_code& ec, const size_t bytes_tran
     }
 
     timeout_timer.cancel();
-    timeout_timer.expires_from_now(std::chrono::seconds(60));
+    timeout_timer.expires_from_now(std::chrono::seconds(15));
     timeout_timer.async_wait(
         std::bind(&Connection::handle_timeout, this, std::placeholders::_1)
     );

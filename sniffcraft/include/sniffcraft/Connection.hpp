@@ -47,7 +47,7 @@ public:
 	void Close();
 
 	/// @brief Get the state of this connection
-	/// @return True if closed, false otherwise 
+	/// @return True if closed, false otherwise
 	bool Closed() const;
 
 private:
