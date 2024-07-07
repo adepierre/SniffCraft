@@ -22,3 +22,7 @@ add_library(imgui STATIC
 set_property(TARGET imgui PROPERTY CXX_STANDARD 11)
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
+
+if(MSVC)
+    set_target_properties(imgui PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded")
+endif()

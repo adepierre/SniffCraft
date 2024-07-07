@@ -104,6 +104,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/i
 target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/private_include")
 target_include_directories(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/botcraft/botcraft/include")
 
+if (MSVC)
+    set_target_properties(${PROJECT_NAME} PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded")
+endif(MSVC)
+
 # Add Asio
 target_link_libraries(${PROJECT_NAME} PUBLIC asio)
 target_compile_definitions(${PROJECT_NAME} PUBLIC ASIO_STANDALONE)
