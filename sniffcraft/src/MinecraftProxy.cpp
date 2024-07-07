@@ -216,6 +216,13 @@ void MinecraftProxy::Handle(Message& msg)
 
 void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
 {
+    if (msg.GetProtocolVersion() != PROTOCOL_VERSION)
+    {
+        std::cout << "WARNING, Client and Sniffcraft protocol versions are different ("
+            << msg.GetProtocolVersion() << " VS " << PROTOCOL_VERSION
+            << "). Logged packet details may be wrong"
+            << std::endl;
+    }
     transmit_original_packet = false;
 
     const ConnectionState old_connection_state = connection_state;
