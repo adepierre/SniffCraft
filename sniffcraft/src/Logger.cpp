@@ -612,7 +612,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
         case ConnectionState::None:
             return -1;
         case ConnectionState::Handshake:
-            for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakeMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakingMessages>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -802,12 +802,12 @@ std::string Logger::GetPacketName(const LogItem& item) const
     switch (item.connection_state)
     {
     case ConnectionState::Play:
-        if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomPayloadPacket::packet_id)
+        if (simple_origin == Endpoint::Server && item.msg->GetId() == Internal::get_tuple_index<ClientboundCustomPayloadPacket, AllClientboundPlayMessages>)
         {
             std::shared_ptr<ClientboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadPacket>(item.msg);
             return packet_name + '|' + custom_payload->GetIdentifier();
         }
-        else if (simple_origin == Endpoint::Client && item.msg->GetId() == ServerboundCustomPayloadPacket::packet_id)
+        else if (simple_origin == Endpoint::Client && item.msg->GetId() == Internal::get_tuple_index<ServerboundCustomPayloadPacket, AllServerboundPlayMessages>)
         {
             std::shared_ptr<ServerboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadPacket>(item.msg);
             return packet_name + '|' + custom_payload->GetIdentifier();
@@ -815,12 +815,12 @@ std::string Logger::GetPacketName(const LogItem& item) const
         break;
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
     case ConnectionState::Configuration:
-        if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomPayloadConfigurationPacket::packet_id)
+        if (simple_origin == Endpoint::Server && item.msg->GetId() == Internal::get_tuple_index<ClientboundCustomPayloadConfigurationPacket, AllClientboundConfigurationMessages>)
         {
             std::shared_ptr<ClientboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadConfigurationPacket>(item.msg);
             return packet_name + '|' + custom_payload->GetIdentifier();
         }
-        else if (simple_origin == Endpoint::Client && item.msg->GetId() == ServerboundCustomPayloadConfigurationPacket::packet_id)
+        else if (simple_origin == Endpoint::Client && item.msg->GetId() == Internal::get_tuple_index<ServerboundCustomPayloadConfigurationPacket, AllServerboundConfigurationMessages>)
         {
             std::shared_ptr<ServerboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadConfigurationPacket>(item.msg);
             return packet_name + '|' + custom_payload->GetIdentifier();
@@ -829,7 +829,7 @@ std::string Logger::GetPacketName(const LogItem& item) const
 #endif
 #if PROTOCOL_VERSION > 340 /* > 1.12.2 */
     case ConnectionState::Login:
-        if (simple_origin == Endpoint::Server && item.msg->GetId() == ClientboundCustomQueryPacket::packet_id)
+        if (simple_origin == Endpoint::Server && item.msg->GetId() == Internal::get_tuple_index<ClientboundCustomQueryPacket, AllClientboundLoginMessages>)
         {
             std::shared_ptr<ClientboundCustomQueryPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomQueryPacket>(item.msg);
             return packet_name + '|' + custom_payload->GetIdentifier().GetFull();

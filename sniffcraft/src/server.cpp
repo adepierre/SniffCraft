@@ -438,7 +438,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
             case ConnectionState::None:
                 return;
             case ConnectionState::Handshake:
-                for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakeMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakingMessages>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::handshaking_key][Conf::ignored_serverbound_key].get_array())
