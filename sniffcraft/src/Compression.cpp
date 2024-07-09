@@ -6,16 +6,9 @@
 #include <stdexcept>
 #include <fstream>
 
-constexpr size_t MAX_COMPRESSED_PACKET_LEN = 200 * 1024;
-
 std::vector<unsigned char> Compress(const std::vector<unsigned char> &data)
 {
     unsigned long compressed_size = compressBound(data.size());
-
-    if (compressed_size > MAX_COMPRESSED_PACKET_LEN)
-    {
-        throw(std::runtime_error("Incoming packet is too big"));
-    }
 
     std::vector<unsigned char> compressed_data(compressed_size);
     int status = compress2(compressed_data.data(), &compressed_size, data.data(), data.size(), Z_DEFAULT_COMPRESSION);
