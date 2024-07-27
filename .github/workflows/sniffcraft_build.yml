@@ -42,6 +42,10 @@ jobs:
       - name: Create build folder
         run: cmake -E make_directory ${{ runner.workspace }}/build
 
+      - name: Set environment variable for macOS
+        if: ${{ inputs.os == 'macos-latest' }}
+        run: echo "CMAKE_OSX_ARCHITECTURES=arm64;x86_64" >> $GITHUB_ENV
+
       - name: Configure cmake
         shell: bash
         working-directory: ${{ runner.workspace }}/build
