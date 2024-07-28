@@ -108,7 +108,7 @@ if (MSVC)
     set_target_properties(${PROJECT_NAME} PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded")
 endif(MSVC)
 
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${PROJECT_NAME} PROPERTIES MACOSX_BUNDLE TRUE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
             OUTPUT_NAME "SniffCraft"
