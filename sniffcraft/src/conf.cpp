@@ -45,12 +45,20 @@ ProtocolCraft::Json::Value Conf::LoadConf()
 {
     if (conf_path.empty())
     {
+#if defined(__APPLE__)
+        conf_path = "/Users/" + std::string(std::getenv("USER")) + "/Library/Application Support/SniffCraft/conf.json";
+#else
         conf_path = "conf.json";
+#endif
     }
 
     // Create file if it doesn't exist
     if (!std::filesystem::exists(conf_path))
     {
+        std::filesystem::path parent_directory = std::filesystem::path(conf_path).parent_path();
+        if (!parent_directory.empty()) {
+          std::filesystem::create_directories(parent_directory);
+        }
         std::ofstream outfile(conf_path, std::ios::out);
         outfile << ProtocolCraft::Json::Value().Dump(4);
     }
