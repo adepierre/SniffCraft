@@ -96,7 +96,7 @@ jobs:
 
       - name: Archive macOS application
         if: ${{ inputs.os == 'macos-latest' }}
-        run: zip -r ${{ github.workspace }}/bin/sniffcraft.zip ${{ github.workspace }}/bin/SniffCraft.app
+        run: cd ${{ github.workspace }}/bin && zip -r sniffcraft.zip SniffCraft.app
 
       - name: Upload macOS artifact
         if: ${{ inputs.os == 'macos-latest' }}
