@@ -423,7 +423,7 @@ void MinecraftProxy::Handle(ServerboundChatPacket& msg)
     transmit_original_packet = false;
 
     // Ugly stuff because there is a GetMessage macro in Windows API somewhere :)
-#if _MSC_VER
+#if _MSC_VER || __MINGW32__
 #pragma push_macro("GetMessage")
 #undef GetMessage
 #endif
@@ -439,7 +439,7 @@ void MinecraftProxy::Handle(ServerboundChatPacket& msg)
     signature = authentifier->GetMessageSignature(msg.GetMessage(), current_message_sent_index, chat_session_uuid, signatures, salt, timestamp);
     replacement_chat_packet->SetLastSeenMessages(updates);
 
-#if _MSC_VER
+#if _MSC_VER || __MINGW32__
 #pragma pop_macro("GetMessage")
 #endif
 
