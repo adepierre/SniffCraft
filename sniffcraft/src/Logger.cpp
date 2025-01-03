@@ -184,7 +184,27 @@ void Logger::Stop()
 }
 
 #ifdef WITH_GUI
-void RenderJson(const Json::Value& json, const int indent_level = 0);
+// Half-transparent orange-ish
+static constexpr ImU32 highlight_color = 2147516671;
+
+/// @brief Given a (potentially) detailed Json, will render it recursively
+/// @param json Json to render
+/// @param start_offset Offset to the end of the data of the start of the current json
+/// @param end_offset Offset to the next byte to the end the current json
+/// @param indent_level Indent level of rendering for the current json
+/// @return First element is a bool indicating if an element of the json is hovered, second element is a pair of offset for the hovered element
+std::pair<bool, std::pair<size_t, size_t>> RenderJson(const Json::Value& json, const size_t start_offset, const size_t end_offset, const int indent_level = 0);
+
+/// @brief Remove bytes offset details from json representation
+/// @param val Detailed (or not) json representation
+/// @return Filtered json representation
+Json::Value RemoveParsingDetails(const Json::Value& val);
+
+/// @brief Find the most detailed json path possible of a given byte
+/// @param json Detailed json representation
+/// @param byte_offset Offset of the byte to find
+/// @return A json path as a string
+std::string GetJsonPath(const Json::Value& json, const size_t byte_offset);
 
 void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title);
 
@@ -193,8 +213,8 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
     std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> return_value = { nullptr, ConnectionState::None, Endpoint::Client };
     ImGui::PushID(base_filename.c_str());
 
-    const float half_size = 0.5f * (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
-    if (ImGui::BeginChild("##packet_names", ImVec2(half_size * 1.15f, 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar))
+    const float available_width = ImGui::GetContentRegionAvail().x;
+    if (ImGui::BeginChild("##packet_names", ImVec2(0.4f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar))
     {
         std::scoped_lock lock(packets_history_mutex);
         ImGuiListClipper clipper;
@@ -213,7 +233,20 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
                     selected_index = packets_history_filtered_indices[i] == selected_index ? -1 : packets_history_filtered_indices[i];
                     if (selected_index != -1)
                     {
-                        selected_json = item.msg->Serialize();
+                        // We need to dump the message to get the bytes
+                        // As fields with non-guaranteed order (e.g. maps)
+                        // might have changed, we need to reparse the bytes
+                        // (otherwise some offset in the json could match a
+                        // different dumped byte)
+                        selected_bytes.clear();
+                        item.msg->Write(selected_bytes);
+                        size_t remaining_bytes = selected_bytes.size();
+                        ReadIterator iter = selected_bytes.cbegin();
+                        // Skip message ID
+                        ReadData<VarInt>(iter, remaining_bytes);
+                        std::shared_ptr<Message> cloned = item.msg->CopyTypeOnly();
+                        cloned->Read(iter, remaining_bytes);
+                        selected_json = cloned->Serialize();
                     }
                 }
                 if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
@@ -270,25 +303,119 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
     }
     ImGui::EndChild();
 
+    std::pair<bool, std::pair<size_t, size_t>> hovered_bytes = { false, { 0, 0 } };
     ImGui::SameLine();
-    ImGui::BeginChild("##json_display", ImVec2(half_size * 0.85f, 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::BeginChild("##json_display", ImVec2(0.3f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
     if (selected_index != -1)
     {
-        RenderJson(selected_json, 0);
+        hovered_bytes = RenderJson(selected_json, selected_bytes.size(), 0, 0);
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Copy").x - ImGui::GetStyle().FramePadding.x * 3 - ImGui::GetStyle().ScrollbarSize + ImGui::GetScrollX());
         ImGui::SetCursorPosY(ImGui::GetStyle().FramePadding.y + ImGui::GetScrollY());
         if (ImGui::Button("Copy"))
         {
-            ImGui::SetClipboardText(selected_json.Dump(4).c_str());
+            ImGui::SetClipboardText(RemoveParsingDetails(selected_json).Dump(4).c_str());
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+    ImGui::BeginChild("##bytes_display", ImVec2(0.3f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
+    if (ImGui::BeginTable("##bytes_table", 10, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_NoClip))
+    {
+        ImGui::TableSetupColumn("##row_index", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("0000000000").x);
+        for (int col = 1; col < 9; ++col)
+        {
+            ImGui::TableSetupColumn(("##byte_" + std::to_string(col)).c_str(), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("00").x);
+        }
+        ImGui::TableSetupColumn("##string_representation", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("00000000").x);
+
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(std::ceil(static_cast<double>(selected_bytes.size()) / 8.0)));
+        while (clipper.Step())
+        {
+            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
+            {
+                ImGui::TableNextRow();
+                for (int column = 0; column < 10; column++)
+                {
+                    ImGui::TableSetColumnIndex(column);
+                    if (column == 0)
+                    {
+                        ImGui::Text("%010s", std::to_string(row * 8).c_str());
+                    }
+                    else if (column == 9)
+                    {
+                        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+                        std::string str_repr = ".";
+                        for (size_t i = 0; i < 8; ++i)
+                        {
+                            const size_t index = row * 8 + i;
+                            const size_t index_offset = selected_bytes.size() - index;
+                            if (index < selected_bytes.size())
+                            {
+                                str_repr[0] = std::isprint(selected_bytes[index]) ? static_cast<char>(selected_bytes[index]) : '.';
+                                ImGui::TextUnformatted(str_repr.c_str());
+                                if (hovered_bytes.first &&
+                                    index_offset <= hovered_bytes.second.first &&
+                                    index_offset > hovered_bytes.second.second)
+                                {
+                                    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+                                    ImVec2 p_min = ImGui::GetItemRectMin();
+                                    ImVec2 p_max = ImGui::GetItemRectMax();
+                                    draw_list->ChannelsSplit(2);
+                                    draw_list->ChannelsSetCurrent(0);
+                                    draw_list->AddRectFilled(p_min, p_max, highlight_color);
+                                    draw_list->ChannelsMerge();
+                                }
+                                if (i < 7)
+                                {
+                                    ImGui::SameLine();
+                                }
+                            }
+                        }
+                        ImGui::PopStyleVar();
+                    }
+                    else
+                    {
+                        const size_t index = row * 8 + column - 1;
+                        const size_t index_offset = selected_bytes.size() - index;
+                        if (index < selected_bytes.size())
+                        {
+                            ImGui::Text("%02X", static_cast<int>(selected_bytes[index]));
+                            if (ImGui::IsItemHovered())
+                            {
+                                const std::string tooltip = GetJsonPath(selected_json, index_offset);
+                                if (!tooltip.empty())
+                                {
+                                    ImGui::SetTooltip(tooltip.c_str());
+                                }
+                            }
+                        }
+                        if (hovered_bytes.first &&
+                            index_offset <= hovered_bytes.second.first &&
+                            index_offset > hovered_bytes.second.second)
+                        {
+                            ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, highlight_color);
+                        }
+                    }
+                }
+            }
+        }
+        clipper.End();
+        ImGui::EndTable();
+        // If hovered with parsed detailed data, scroll to the corresponding row
+        if (hovered_bytes.first && hovered_bytes.second.first != 0)
+        {
+            ImGui::SetScrollY(clipper.ItemsHeight * std::floorf(static_cast<float>(selected_bytes.size() - hovered_bytes.second.first) / 8.0f));
         }
     }
     ImGui::EndChild();
 
     {
         std::scoped_lock<std::mutex> lock(network_recap_mutex);
-        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, half_size, "Server --> Client");
+        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Server --> Client");
         ImGui::SameLine();
-        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, half_size, "Client --> Server");
+        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Client --> Server");
     }
 
     ImGui::PopID();
@@ -443,7 +570,11 @@ void Logger::LogConsume()
             }
             if (is_detailed)
             {
+#ifdef WITH_GUI
+                output << "\n" << RemoveParsingDetails(item.msg->Serialize()).Dump(4);
+#else
                 output << "\n" << item.msg->Serialize().Dump(4);
+#endif
             }
 
             const std::string output_str = output.str();
@@ -552,7 +683,7 @@ void Logger::LoadConfig()
         }
     }
 #endif
-    std::cout << "Conf file loaded!" << std::endl;
+    std::cout << "Conf file loaded from " << Conf::conf_path << std::endl;
 }
 
 int GetIdFromName(const std::string& name, const ConnectionState connection_state, const bool clientbound)
@@ -1294,7 +1425,7 @@ std::string Logger::GenerateNetworkRecap(const int max_entry, const int max_name
 }
 
 #ifdef WITH_GUI
-void RenderJson(const Json::Value& json, const int indent_level)
+std::pair<bool, std::pair<size_t, size_t>> RenderJson(const Json::Value& json, const size_t start_offset, const size_t end_offset, const int indent_level)
 {
     std::string indent_string = "";
     for (int i = 0; i < indent_level; ++i)
@@ -1302,78 +1433,200 @@ void RenderJson(const Json::Value& json, const int indent_level)
         indent_string += "  ";
     }
 
-    if (json.is_object())
+    if (json.is_object() && json.contains("start_offset") && json.contains("end_offset") && json.contains("content"))
+    {
+        return RenderJson(json["content"], json["start_offset"].get<unsigned long long int>(), json["end_offset"].get<unsigned long long int>(), indent_level);
+    }
+    else if (json.is_object())
     {
         ImGui::TextUnformatted("{");
+        bool object_hovered = ImGui::IsItemHovered();
+        std::pair<bool, std::pair<size_t, size_t>> child_return = { false, { start_offset, end_offset} };
         size_t index = 0;
         for (const auto& [k, v] : json.get_object())
         {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.5f, 1.0f));
             ImGui::TextUnformatted((indent_string + "  \"" + k + "\": ").c_str());
+            bool child_hovered = ImGui::IsItemHovered();
             ImGui::PopStyleColor();
             ImGui::SameLine(0.0f, 0.0f);
-            RenderJson(v, indent_level + 1);
+            const std::pair<bool, std::pair<size_t, size_t>> current_child_return = RenderJson(v, start_offset, end_offset, indent_level + 1);
             index += 1;
             if (index < json.size())
             {
                 ImGui::SameLine(0.0f, 0.0f);
                 ImGui::TextUnformatted(",");
+                child_hovered |= ImGui::IsItemHovered();
+            }
+            if (current_child_return.first || child_hovered)
+            {
+                child_return.first = true;
+                child_return.second = current_child_return.second;
             }
         }
         ImGui::TextUnformatted((indent_string + "}").c_str());
+        object_hovered |= ImGui::IsItemHovered();
+
+        if (child_return.first)
+        {
+            return child_return;
+        }
+        if (object_hovered)
+        {
+            return { true, { start_offset, end_offset } };
+        }
     }
     else if (json.is_array())
     {
         ImGui::TextUnformatted("[");
+        bool object_hovered = ImGui::IsItemHovered();
+        std::pair<bool, std::pair<size_t, size_t>> child_return = { false, { start_offset, end_offset} };
         size_t index = 0;
         for (const auto& v : json.get_array())
         {
             ImGui::TextUnformatted((indent_string + "  ").c_str());
+            bool child_hovered = ImGui::IsItemHovered();
             ImGui::SameLine(0.0f, 0.0f);
-            RenderJson(v, indent_level + 1);
+            const std::pair<bool, std::pair<size_t, size_t>> current_child_return = RenderJson(v, start_offset, end_offset, indent_level + 1);
             index += 1;
             if (index < json.size())
             {
                 ImGui::SameLine(0.0f, 0.0f);
                 ImGui::TextUnformatted(",");
+                child_hovered |= ImGui::IsItemHovered();
+            }
+            if (current_child_return.first || child_hovered)
+            {
+                child_return.first = true;
+                child_return.second = current_child_return.second;
             }
         }
         ImGui::TextUnformatted((indent_string + "]").c_str());
+        object_hovered |= ImGui::IsItemHovered();
+        if (child_return.first)
+        {
+            return child_return;
+        }
+        if (object_hovered)
+        {
+            return { true, { start_offset, end_offset } };
+        }
     }
-    else if (json.is_null())
+    else
     {
-        ImGui::TextUnformatted("{ }");
+        if (json.is_null())
+        {
+            ImGui::TextUnformatted("{ }");
+        }
+        else if (json.is_string())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.75f, 1.0f, 1.0f));
+            ImGui::TextUnformatted(('"' + json.get_string() + '"').c_str());
+            ImGui::PopStyleColor();
+        }
+        else if (json.is<unsigned long long int>())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
+            ImGui::TextUnformatted(std::to_string(json.get_number<unsigned long long int>()).c_str());
+            ImGui::PopStyleColor();
+        }
+        else if (json.is<long long int>())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
+            ImGui::TextUnformatted(std::to_string(json.get_number<long long int>()).c_str());
+            ImGui::PopStyleColor();
+        }
+        else if (json.is_number())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
+            ImGui::TextUnformatted(std::to_string(json.get_number()).c_str());
+            ImGui::PopStyleColor();
+        }
+        else if (json.is_bool())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.75f, 1.0f));
+            ImGui::TextUnformatted((json.get<bool>() ? "true" : "false"));
+            ImGui::PopStyleColor();
+        }
+        if (ImGui::IsItemHovered())
+        {
+            return { true, { start_offset, end_offset } };
+        }
     }
-    else if (json.is_string())
+
+    return { false, { start_offset, end_offset} };
+}
+
+Json::Value RemoveParsingDetails(const Json::Value& val)
+{
+    if (val.is_array())
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.75f, 1.0f, 1.0f));
-        ImGui::TextUnformatted(('"' + json.get_string() + '"').c_str());
-        ImGui::PopStyleColor();
+        Json::Array output;
+        output.reserve(val.size());
+        for (const auto& v : val.get_array())
+        {
+            output.push_back(RemoveParsingDetails(v));
+        }
+        return output;
     }
-    else if (json.is<unsigned long long int>())
+    else if (val.is_object())
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
-        ImGui::TextUnformatted(std::to_string(json.get_number<unsigned long long int>()).c_str());
-        ImGui::PopStyleColor();
+        if (val.contains("content") && val.contains("start_offset") && val.contains("end_offset"))
+        {
+            return RemoveParsingDetails(val["content"]);
+        }
+        else
+        {
+            Json::Object output;
+            for (const auto& [k, v] : val.get_object())
+            {
+                output[k] = RemoveParsingDetails(v);
+            }
+            return output;
+        }
     }
-    else if (json.is<long long int>())
+    else
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
-        ImGui::TextUnformatted(std::to_string(json.get_number<long long int>()).c_str());
-        ImGui::PopStyleColor();
+        return val;
     }
-    else if (json.is_number())
+}
+
+std::string GetJsonPath(const Json::Value& json, const size_t byte_offset)
+{
+    if (json.is_object())
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 1.0f, 1.0f, 1.0f));
-        ImGui::TextUnformatted(std::to_string(json.get_number()).c_str());
-        ImGui::PopStyleColor();
+        for (const auto& [k, v] : json.get_object())
+        {
+            if (v.is_object() &&
+                v.contains("start_offset") &&
+                v.contains("end_offset") &&
+                v.contains("content") &&
+                v["start_offset"].get<unsigned long long int>() >= byte_offset &&
+                v["end_offset"].get<unsigned long long int>() < byte_offset
+                )
+            {
+                return "." + k + GetJsonPath(v["content"], byte_offset);
+            }
+        }
     }
-    else if (json.is_bool())
+    else if (json.is_array())
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.75f, 1.0f));
-        ImGui::TextUnformatted((json.get<bool>() ? "true" : "false"));
-        ImGui::PopStyleColor();
+        for (size_t i = 0; i < json.size(); ++i)
+        {
+            const Json::Value& e = json[i];
+            if (e.is_object() &&
+                e.contains("start_offset") &&
+                e.contains("end_offset") &&
+                e.contains("content") &&
+                e["start_offset"].get<unsigned long long int>() >= byte_offset &&
+                e["end_offset"].get<unsigned long long int>() < byte_offset
+                )
+            {
+                return "[" + std::to_string(i) + "]" + GetJsonPath(e["content"], byte_offset);
+            }
+        }
     }
+    return "";
 }
 
 void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title)

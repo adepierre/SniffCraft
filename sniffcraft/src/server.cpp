@@ -245,7 +245,7 @@ void Server::Render()
 #endif
 
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-    GLFWwindow* window = glfwCreateWindow(960, 960, "SniffCraft", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1200, 960, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
         std::cerr << "Failed to create GLFW window, you can launch SniffCraft without GUI with the --headless argument" << std::endl;
@@ -710,7 +710,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                     Conf::SaveConf(conf);
                 }
                 ImGui::SameLine();
-                HelpMarker("If checked, raw bytes will also be part of the logs");
+                HelpMarker("If checked, raw bytes will be added in the console and text file");
                 ImGui::SameLine(0.0f, 10.0f);
                 if (ImGui::Checkbox("Text file", &log_to_text_file))
                 {

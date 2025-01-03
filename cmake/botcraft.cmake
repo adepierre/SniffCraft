@@ -1,4 +1,4 @@
-#Download botcraft library
+# Download botcraft library
 
 file(GLOB RESULT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/botcraft/protocolCraft")
 list(LENGTH RESULT RES_LEN)
@@ -9,3 +9,8 @@ endif()
 
 set(BOTCRAFT_OUTPUT_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Base output build path for protocolCraft")
 set(PROTOCOLCRAFT_STATIC ON)
+if(SNIFFCRAFT_WITH_GUI)
+    set(PROTOCOLCRAFT_DETAILED_PARSING ON)
+else()
+    set(PROTOCOLCRAFT_DETAILED_PARSING OFF)
+endif()

@@ -91,6 +91,7 @@ private:
     std::vector<size_t> packets_history_filtered_indices;
     std::mutex packets_history_mutex;
     long long int selected_index = -1;
+    std::vector<unsigned char> selected_bytes;
     ProtocolCraft::Json::Value selected_json;
 #endif
 };
