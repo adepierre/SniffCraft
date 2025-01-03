@@ -25,6 +25,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Packet logging with different levels of details (ignore packet, log packet name only, log full packet content)
 - Detailed network usage recap
 - Compression is supported
+- Byte level packet inspection
 - Offline ("cracked") mode and online mode (with Microsoft account) are supported
 - Secure chat is supported
 - Logging raw packets at byte level
@@ -36,7 +37,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 
 1.20.5 transfer packet is **not** supported yet.
 
-<img width="600" src="https://github.com/adepierre/SniffCraft/assets/24371370/8c6b04d3-61e6-4fdc-aa1e-7e9505ac6033" alt="Sniffcraft GUI" align="center">
+<img width="750" src="https://github.com/user-attachments/assets/49d46827-2001-4607-8b6b-b496c73f95bc" alt="Sniffcraft GUI" align="center">
 
 
 ### Encryption is supported
