@@ -406,7 +406,7 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
         // If hovered with parsed detailed data, scroll to the corresponding row
         if (hovered_bytes.first && hovered_bytes.second.first != 0)
         {
-            ImGui::SetScrollY(clipper.ItemsHeight * std::floorf(static_cast<float>(selected_bytes.size() - hovered_bytes.second.first) / 8.0f));
+            ImGui::SetScrollY(clipper.ItemsHeight * std::floor(static_cast<float>(selected_bytes.size() - hovered_bytes.second.first) / 8.0f));
         }
     }
     ImGui::EndChild();
