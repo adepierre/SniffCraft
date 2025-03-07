@@ -4,6 +4,9 @@ on:
   issues:
     types: [opened, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}
+
 jobs:
   check_if_build_needed:
     runs-on: ubuntu-latest
