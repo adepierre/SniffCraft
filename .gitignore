@@ -1,3 +1,11 @@
 bin/
 build/
 lib/
+
+.vscode/
+.idea/
+
+# CLion build directory
+/cmake-**
+
+.DS_Store
