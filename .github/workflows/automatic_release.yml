@@ -88,7 +88,7 @@ jobs:
         run: |
           mv linux/sniffcraft sniffcraft-linux-${{ steps.mc-version.outputs.version }}
           mv windows/sniffcraft.exe sniffcraft-windows-${{ steps.mc-version.outputs.version }}.exe
-          mv macos/sniffcraft sniffcraft-macos-${{ steps.mc-version.outputs.version }}
+          mv macos/sniffcraft.zip sniffcraft-macos-universal-${{ steps.mc-version.outputs.version }}.zip
 
       - name: Remove old latest release
         run: gh release delete latest --repo ${{ github.repository }} --cleanup-tag -y
@@ -100,7 +100,7 @@ jobs:
           gh release create latest
           sniffcraft-linux-${{ steps.mc-version.outputs.version }}
           sniffcraft-windows-${{ steps.mc-version.outputs.version }}.exe
-          sniffcraft-macos-${{ steps.mc-version.outputs.version }}
+          sniffcraft-macos-universal-${{ steps.mc-version.outputs.version }}.zip
           --repo ${{ github.repository }}
           --latest
           -F release_note.txt
