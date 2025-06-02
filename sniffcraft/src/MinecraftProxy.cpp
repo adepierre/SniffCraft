@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include <protocolCraft/BinaryReadWrite.hpp>
-#include <protocolCraft/MessageFactory.hpp>
+#include <protocolCraft/PacketFactory.hpp>
 #include <protocolCraft/Utilities/Json.hpp>
 
 #ifdef USE_ENCRYPTION
@@ -109,22 +109,22 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
 
     const int minecraft_id = ReadData<VarInt>(data_iterator, remaining_packet_bytes);
 
-    std::shared_ptr<Message> msg = source == Endpoint::Client ?
-        CreateServerboundMessage(connection_state, minecraft_id) :
-        CreateClientboundMessage(connection_state, minecraft_id);
+    std::shared_ptr<Packet> packet = source == Endpoint::Client ?
+        CreateServerboundPacket(connection_state, minecraft_id) :
+        CreateClientboundPacket(connection_state, minecraft_id);
 
     // Clear the replacement bytes vector
     bool error_parsing = false;
-    if (msg != nullptr)
+    if (packet != nullptr)
     {
         try
         {
-            msg->Read(data_iterator, remaining_packet_bytes);
+            packet->Read(data_iterator, remaining_packet_bytes);
         }
         catch (const std::exception& ex)
         {
             std::cout << ((source == Endpoint::Server) ? "Server --> Client: " : "Client --> Server: ") <<
-                "PARSING EXCEPTION for message " << msg->GetName() << "(: " << minecraft_id << ")" << ex.what() << std::endl;
+                "PARSING EXCEPTION for message " << packet->GetName() << "(: " << minecraft_id << ")" << ex.what() << std::endl;
             error_parsing = true;
         }
     }
@@ -140,7 +140,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     if (!error_parsing)
     {
         // React to the message if necessary
-        msg->Dispatch(this);
+        packet->Dispatch(this);
     }
 
     // Transfer the data as they came
@@ -149,10 +149,10 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
         // The packet is transmitted, log it as it is
         if (!error_parsing)
         {
-            logger->Log(msg, old_connection_state, source, packet_length + packet_length_length);
+            logger->Log(packet, old_connection_state, source, packet_length + packet_length_length);
             if (replay_logger)
             {
-                replay_logger->Log(msg, old_connection_state, source);
+                replay_logger->Log(packet, old_connection_state, source);
             }
         }
 
@@ -162,7 +162,7 @@ size_t MinecraftProxy::ProcessData(const std::vector<unsigned char>::const_itera
     else if (!error_parsing)
     {
         // The packet has been replaced, log it as intercepted by sniffcraft
-        logger->Log(msg, old_connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft, packet_length + packet_length_length);
+        logger->Log(packet, old_connection_state, source == Endpoint::Server ? Endpoint::ServerToSniffcraft : Endpoint::ClientToSniffcraft, packet_length + packet_length_length);
     }
 
     // Return the number of bytes we read (or rather should have read in case of error)
@@ -181,10 +181,10 @@ size_t MinecraftProxy::Peek(std::vector<unsigned char>::const_iterator& data, si
     }
 }
 
-std::vector<unsigned char> MinecraftProxy::PacketToBytes(const Message& msg) const
+std::vector<unsigned char> MinecraftProxy::PacketToBytes(const Packet& packet) const
 {
     std::vector<unsigned char> content;
-    msg.Write(content);
+    packet.Write(content);
 
     if (compression_threshold > -1)
     {
@@ -209,35 +209,30 @@ std::vector<unsigned char> MinecraftProxy::PacketToBytes(const Message& msg) con
     return sized_packet;
 }
 
-void MinecraftProxy::Handle(Message& msg)
+void MinecraftProxy::Handle(ServerboundClientIntentionPacket& packet)
 {
-
-}
-
-void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
-{
-    if (msg.GetProtocolVersion() != PROTOCOL_VERSION)
+    if (packet.GetProtocolVersion() != PROTOCOL_VERSION)
     {
         std::cout << "WARNING, Client and Sniffcraft protocol versions are different ("
-            << msg.GetProtocolVersion() << " VS " << PROTOCOL_VERSION
+            << packet.GetProtocolVersion() << " VS " << PROTOCOL_VERSION
             << "). Logged packet details may be wrong"
             << std::endl;
     }
     transmit_original_packet = false;
 
     const ConnectionState old_connection_state = connection_state;
-    connection_state = static_cast<ConnectionState>(msg.GetIntention());
+    connection_state = static_cast<ConnectionState>(packet.GetIntention());
 
     std::shared_ptr<ServerboundClientIntentionPacket> replacement_intention_packet = std::make_shared<ServerboundClientIntentionPacket>();
-    replacement_intention_packet->SetIntention(msg.GetIntention());
-    replacement_intention_packet->SetProtocolVersion(msg.GetProtocolVersion());
+    replacement_intention_packet->SetIntention(packet.GetIntention());
+    replacement_intention_packet->SetProtocolVersion(packet.GetProtocolVersion());
     std::string new_hostname = server_ip_;
-    const size_t old_hostname_strlen = strlen(msg.GetHostName().c_str());
+    const size_t old_hostname_strlen = strlen(packet.GetHostName().c_str());
     // Forge adds \0FML\0, \0FML2\0 or \0FML3\0 to the hostname
     // strlen will only count the size until the fist \0
-    if (msg.GetHostName().size() > old_hostname_strlen)
+    if (packet.GetHostName().size() > old_hostname_strlen)
     {
-        new_hostname += msg.GetHostName().substr(old_hostname_strlen);
+        new_hostname += packet.GetHostName().substr(old_hostname_strlen);
     }
     replacement_intention_packet->SetHostName(new_hostname);
     replacement_intention_packet->SetPort(server_port_);
@@ -250,7 +245,7 @@ void MinecraftProxy::Handle(ServerboundClientIntentionPacket& msg)
     // Don't replay log it as it's serverbound
 }
 
-void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
+void MinecraftProxy::Handle(ServerboundHelloPacket& packet)
 {
 #ifdef USE_ENCRYPTION
     if (authentifier == nullptr)
@@ -272,7 +267,7 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
     ProfilePublicKey key;
     key.SetTimestamp(authentifier->GetKeyTimestamp());
     const std::vector<unsigned char> key_bytes = Botcraft::Utilities::RSAToBytes(authentifier->GetPublicKey());
-    if (!msg.GetPublicKey().has_value() || key_bytes != msg.GetPublicKey().value().GetKey())
+    if (!packet.GetPublicKey().has_value() || key_bytes != packet.GetPublicKey().value().GetKey())
     {
         std::cerr << "WARNING, public key mismatch between client and sniffcraft.\n"
             << "You might get kicked out if you send a chat message" << std::endl;
@@ -295,18 +290,18 @@ void MinecraftProxy::Handle(ServerboundHelloPacket& msg)
 }
 
 #if PROTOCOL_VERSION < 764 /* < 1.20.2 */
-void MinecraftProxy::Handle(ClientboundGameProfilePacket& msg)
+void MinecraftProxy::Handle(ClientboundGameProfilePacket& packet)
 {
     connection_state = ConnectionState::Play;
 }
 #endif
 
-void MinecraftProxy::Handle(ClientboundLoginCompressionPacket& msg)
+void MinecraftProxy::Handle(ClientboundLoginCompressionPacket& packet)
 {
-    compression_threshold = msg.GetCompressionThreshold();
+    compression_threshold = packet.GetCompressionThreshold();
 }
 
-void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
+void MinecraftProxy::Handle(ClientboundHelloPacket& packet)
 {
 #ifdef USE_ENCRYPTION
     if (authentifier == nullptr)
@@ -328,44 +323,44 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
 
 #if PROTOCOL_VERSION < 759 /* < 1.19 */
     std::vector<unsigned char> encrypted_nonce;
-    encrypter->Init(msg.GetPublicKey(), msg.GetNonce(),
+    encrypter->Init(packet.GetPublicKey(), packet.GetNonce(),
         raw_shared_secret, encrypted_nonce, encrypted_shared_secret);
 #elif PROTOCOL_VERSION < 761 /* < 1.19.3 */
     std::vector<unsigned char> salted_nonce_signature;
     long long int salt;
-    encrypter->Init(msg.GetPublicKey(), msg.GetNonce(), authentifier->GetPrivateKey(),
+    encrypter->Init(packet.GetPublicKey(), packet.GetNonce(), authentifier->GetPrivateKey(),
         raw_shared_secret, encrypted_shared_secret,
         salt, salted_nonce_signature);
 #else
     std::vector<unsigned char> encrypted_challenge;
-    encrypter->Init(msg.GetPublicKey(), msg.GetChallenge(),
+    encrypter->Init(packet.GetPublicKey(), packet.GetChallenge(),
         raw_shared_secret, encrypted_shared_secret, encrypted_challenge);
 #endif
 
-    authentifier->JoinServer(msg.GetServerId(), raw_shared_secret, msg.GetPublicKey());
+    authentifier->JoinServer(packet.GetServerId(), raw_shared_secret, packet.GetPublicKey());
 
-    std::shared_ptr<ServerboundKeyPacket> response_msg = std::make_shared<ServerboundKeyPacket>();
-    response_msg->SetKeyBytes(encrypted_shared_secret);
+    std::shared_ptr<ServerboundKeyPacket> response_packet = std::make_shared<ServerboundKeyPacket>();
+    response_packet->SetKeyBytes(encrypted_shared_secret);
 #if PROTOCOL_VERSION < 759 /* < 1.19 */
     // Pre-1.19 behaviour, send encrypted nonce
-    response_msg->SetNonce(encrypted_nonce);
+    response_packet->SetNonce(encrypted_nonce);
 #elif PROTOCOL_VERSION < 761 /* < 1.19.3 */
     // 1.19 - 1.19.2 behaviour, send salted nonce signature
     SaltSignature salt_signature;
     salt_signature.SetSalt(salt);
     salt_signature.SetSignature(salted_nonce_signature);
-    response_msg->SetSaltSignature(salt_signature);
+    response_packet->SetSaltSignature(salt_signature);
 #else
     // 1.19.3+ behaviour, back to sending encrypted challenge only
-    response_msg->SetEncryptedChallenge(encrypted_challenge);
+    response_packet->SetEncryptedChallenge(encrypted_challenge);
 #endif
 
     // Send additional packet only to server on behalf of the client
-    const std::vector<unsigned char> replacement_bytes = PacketToBytes(*response_msg);
+    const std::vector<unsigned char> replacement_bytes = PacketToBytes(*response_packet);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
 
     // We don't log packet size as it's not really part of the network data
-    logger->Log(response_msg, connection_state, Endpoint::SniffcraftToServer, 0);
+    logger->Log(response_packet, connection_state, Endpoint::SniffcraftToServer, 0);
 
     // Set the encrypter for any future message from the server
     std::unique_ptr<DataProcessor> encryption_data_processor = std::make_unique<MinecraftEncryptionDataProcessor>(encrypter);
@@ -379,14 +374,14 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& msg)
 }
 
 #if USE_ENCRYPTION && PROTOCOL_VERSION > 760 /* > 1.19.1/2 */
-void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
+void MinecraftProxy::Handle(ClientboundLoginPacket& packet)
 {
     if (authentifier == nullptr)
     {
         return;
     }
 
-    std::shared_ptr<ServerboundChatSessionUpdatePacket> chat_session_msg = std::make_shared<ServerboundChatSessionUpdatePacket>();
+    std::shared_ptr<ServerboundChatSessionUpdatePacket> chat_session_packet = std::make_shared<ServerboundChatSessionUpdatePacket>();
     RemoteChatSessionData chat_session_data;
 
     ProfilePublicKey key;
@@ -404,16 +399,16 @@ void MinecraftProxy::Handle(ClientboundLoginPacket& msg)
     }
     chat_session_data.SetUuid(chat_session_uuid);
 
-    chat_session_msg->SetChatSession(chat_session_data);
-    std::vector<unsigned char> chat_session_msg_bytes = PacketToBytes(*chat_session_msg);
+    chat_session_packet->SetChatSession(chat_session_data);
+    std::vector<unsigned char> chat_session_packet_bytes = PacketToBytes(*chat_session_packet);
 
-    server_connection.WriteData(chat_session_msg_bytes.data(), chat_session_msg_bytes.size());
+    server_connection.WriteData(chat_session_packet_bytes.data(), chat_session_packet_bytes.size());
 
     // We don't log packet size as it's not really part of the network data
-    logger->Log(chat_session_msg, connection_state, Endpoint::SniffcraftToServer, 0);
+    logger->Log(chat_session_packet, connection_state, Endpoint::SniffcraftToServer, 0);
 }
 
-void MinecraftProxy::Handle(ServerboundChatPacket& msg)
+void MinecraftProxy::Handle(ServerboundChatPacket& packet)
 {
     if (authentifier == nullptr)
     {
@@ -429,14 +424,14 @@ void MinecraftProxy::Handle(ServerboundChatPacket& msg)
 #endif
 
     std::shared_ptr<ServerboundChatPacket> replacement_chat_packet = std::make_shared<ServerboundChatPacket>();
-    replacement_chat_packet->SetMessage(msg.GetMessage());
+    replacement_chat_packet->SetMessage(packet.GetMessage());
 
     long long int salt, timestamp;
     std::vector<unsigned char> signature;
 
     const auto [signatures, updates] = chat_context.GetLastSeenMessagesUpdate();
     const int current_message_sent_index = message_sent_index++;
-    signature = authentifier->GetMessageSignature(msg.GetMessage(), current_message_sent_index, chat_session_uuid, signatures, salt, timestamp);
+    signature = authentifier->GetMessageSignature(packet.GetMessage(), current_message_sent_index, chat_session_uuid, signatures, salt, timestamp);
     replacement_chat_packet->SetLastSeenMessages(updates);
 
 #if _MSC_VER || __MINGW32__
@@ -458,9 +453,9 @@ void MinecraftProxy::Handle(ServerboundChatPacket& msg)
 }
 
 #if PROTOCOL_VERSION < 766 /* < 1.20.5 */
-void MinecraftProxy::Handle(ServerboundChatCommandPacket& msg)
+void MinecraftProxy::Handle(ServerboundChatCommandPacket& packet)
 #else
-void MinecraftProxy::Handle(ServerboundChatCommandSignedPacket& msg)
+void MinecraftProxy::Handle(ServerboundChatCommandSignedPacket& packet)
 #endif
 {
     if (authentifier == nullptr)
@@ -475,12 +470,12 @@ void MinecraftProxy::Handle(ServerboundChatCommandSignedPacket& msg)
 #else
     std::shared_ptr<ServerboundChatCommandSignedPacket> replacement_chat_command = std::make_shared<ServerboundChatCommandSignedPacket>();
 #endif
-    replacement_chat_command->SetCommand(msg.GetCommand());
-    replacement_chat_command->SetTimestamp(msg.GetTimestamp());
-    replacement_chat_command->SetSalt(msg.GetSalt());
+    replacement_chat_command->SetCommand(packet.GetCommand());
+    replacement_chat_command->SetTimestamp(packet.GetTimestamp());
+    replacement_chat_command->SetSalt(packet.GetSalt());
     const auto [signatures, updates] = chat_context.GetLastSeenMessagesUpdate();
     replacement_chat_command->SetLastSeenMessages(updates);
-    replacement_chat_command->SetArgumentSignatures(msg.GetArgumentSignatures());
+    replacement_chat_command->SetArgumentSignatures(packet.GetArgumentSignatures());
 
     const std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_chat_command);
     server_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
@@ -488,43 +483,43 @@ void MinecraftProxy::Handle(ServerboundChatCommandSignedPacket& msg)
     logger->Log(replacement_chat_command, connection_state, Endpoint::SniffcraftToServer, 0);
 }
 
-void MinecraftProxy::Handle(ClientboundPlayerChatPacket& msg)
+void MinecraftProxy::Handle(ClientboundPlayerChatPacket& packet)
 {
     if (authentifier == nullptr)
     {
         return;
     }
 
-    if (msg.GetSignature().has_value())
+    if (packet.GetSignature().has_value())
     {
-        chat_context.AddSeenMessage(std::vector<unsigned char>(msg.GetSignature().value().begin(), msg.GetSignature().value().end()));
+        chat_context.AddSeenMessage(std::vector<unsigned char>(packet.GetSignature().value().begin(), packet.GetSignature().value().end()));
 
         if (chat_context.GetOffset() > 64)
         {
-            std::shared_ptr<ServerboundChatAckPacket> ack_msg = std::make_shared<ServerboundChatAckPacket>();
-            ack_msg->SetOffset(chat_context.GetAndResetOffset());
+            std::shared_ptr<ServerboundChatAckPacket> ack_packet = std::make_shared<ServerboundChatAckPacket>();
+            ack_packet->SetOffset(chat_context.GetAndResetOffset());
 
-            const std::vector<unsigned char> replacement_bytes_ack = PacketToBytes(*ack_msg);
+            const std::vector<unsigned char> replacement_bytes_ack = PacketToBytes(*ack_packet);
             server_connection.WriteData(replacement_bytes_ack.data(), replacement_bytes_ack.size());
             // We don't log packet size as it's not really part of the network data
-            logger->Log(ack_msg, connection_state, Endpoint::SniffcraftToServer, 0);
+            logger->Log(ack_packet, connection_state, Endpoint::SniffcraftToServer, 0);
         }
     }
 }
 #endif
 
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
-void MinecraftProxy::Handle(ServerboundLoginAcknowledgedPacket& msg)
+void MinecraftProxy::Handle(ServerboundLoginAcknowledgedPacket& packet)
 {
     connection_state = ConnectionState::Configuration;
 }
 
-void MinecraftProxy::Handle(ServerboundFinishConfigurationPacket& msg)
+void MinecraftProxy::Handle(ServerboundFinishConfigurationPacket& packet)
 {
     connection_state = ConnectionState::Play;
 }
 
-void MinecraftProxy::Handle(ServerboundConfigurationAcknowledgedPacket& msg)
+void MinecraftProxy::Handle(ServerboundConfigurationAcknowledgedPacket& packet)
 {
     connection_state = ConnectionState::Configuration;
 }

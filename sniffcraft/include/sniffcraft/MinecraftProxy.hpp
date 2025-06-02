@@ -39,32 +39,31 @@ private:
     size_t Peek(std::vector<unsigned char>::const_iterator& data, size_t& length);
 
     /// @brief Convert a MC packet to bytes vector
-    /// @param msg Packet to convert
+    /// @param packet Packet to convert
     /// @return Bytes representation of the packet
-    std::vector<unsigned char> PacketToBytes(const ProtocolCraft::Message& msg) const;
+    std::vector<unsigned char> PacketToBytes(const ProtocolCraft::Packet& packet) const;
 
-    virtual void Handle(ProtocolCraft::Message& msg) override;
-    virtual void Handle(ProtocolCraft::ServerboundClientIntentionPacket& msg) override;
-    virtual void Handle(ProtocolCraft::ServerboundHelloPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundClientIntentionPacket& packet) override;
+    virtual void Handle(ProtocolCraft::ServerboundHelloPacket& packet) override;
 #if PROTOCOL_VERSION < 764 /* < 1.20.2 */
-    virtual void Handle(ProtocolCraft::ClientboundGameProfilePacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundGameProfilePacket& packet) override;
 #endif
-    virtual void Handle(ProtocolCraft::ClientboundLoginCompressionPacket& msg) override;
-    virtual void Handle(ProtocolCraft::ClientboundHelloPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundLoginCompressionPacket& packet) override;
+    virtual void Handle(ProtocolCraft::ClientboundHelloPacket& packet) override;
 #if USE_ENCRYPTION && PROTOCOL_VERSION > 760 /* > 1.19.1/2 */
-    virtual void Handle(ProtocolCraft::ClientboundLoginPacket& msg) override;
-    virtual void Handle(ProtocolCraft::ServerboundChatPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundLoginPacket& packet) override;
+    virtual void Handle(ProtocolCraft::ServerboundChatPacket& packet) override;
 #if PROTOCOL_VERSION < 766 /* < 1.20.5 */
-    virtual void Handle(ProtocolCraft::ServerboundChatCommandPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundChatCommandPacket& packet) override;
 #else
-    virtual void Handle(ProtocolCraft::ServerboundChatCommandSignedPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundChatCommandSignedPacket& packet) override;
 #endif
-    virtual void Handle(ProtocolCraft::ClientboundPlayerChatPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ClientboundPlayerChatPacket& packet) override;
 #endif
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
-    virtual void Handle(ProtocolCraft::ServerboundLoginAcknowledgedPacket& msg) override;
-    virtual void Handle(ProtocolCraft::ServerboundFinishConfigurationPacket& msg) override;
-    virtual void Handle(ProtocolCraft::ServerboundConfigurationAcknowledgedPacket& msg) override;
+    virtual void Handle(ProtocolCraft::ServerboundLoginAcknowledgedPacket& packet) override;
+    virtual void Handle(ProtocolCraft::ServerboundFinishConfigurationPacket& packet) override;
+    virtual void Handle(ProtocolCraft::ServerboundConfigurationAcknowledgedPacket& packet) override;
 #endif
 
 private:

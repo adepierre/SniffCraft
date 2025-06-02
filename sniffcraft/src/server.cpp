@@ -363,7 +363,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
             case ConnectionState::Handshake:
                 return;
             case ConnectionState::Status:
-                for (const auto& s : PacketNameIdExtractor<AllClientboundStatusMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllClientboundStatusPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::status_key][Conf::ignored_clientbound_key].get_array())
@@ -379,7 +379,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 break;
             case ConnectionState::Login:
-                for (const auto& s : PacketNameIdExtractor<AllClientboundLoginMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllClientboundLoginPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::login_key][Conf::ignored_clientbound_key].get_array())
@@ -395,7 +395,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 break;
             case ConnectionState::Play:
-                for (const auto& s : PacketNameIdExtractor<AllClientboundPlayMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllClientboundPlayPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::play_key][Conf::ignored_clientbound_key].get_array())
@@ -412,7 +412,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 break;
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
             case ConnectionState::Configuration:
-                for (const auto& s : PacketNameIdExtractor<AllClientboundConfigurationMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllClientboundConfigurationPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::configuration_key][Conf::ignored_clientbound_key].get_array())
@@ -438,7 +438,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
             case ConnectionState::None:
                 return;
             case ConnectionState::Handshake:
-                for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakingMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakingPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::handshaking_key][Conf::ignored_serverbound_key].get_array())
@@ -454,7 +454,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 break;
             case ConnectionState::Status:
-                for (const auto& s : PacketNameIdExtractor<AllServerboundStatusMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllServerboundStatusPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::status_key][Conf::ignored_serverbound_key].get_array())
@@ -470,7 +470,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 break;
             case ConnectionState::Login:
-                for (const auto& s : PacketNameIdExtractor<AllServerboundLoginMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllServerboundLoginPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::login_key][Conf::ignored_serverbound_key].get_array())
@@ -486,7 +486,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 break;
             case ConnectionState::Play:
-                for (const auto& s : PacketNameIdExtractor<AllServerboundPlayMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllServerboundPlayPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::play_key][Conf::ignored_serverbound_key].get_array())
@@ -503,7 +503,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 break;
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
             case ConnectionState::Configuration:
-                for (const auto& s : PacketNameIdExtractor<AllServerboundConfigurationMessages>::name_ids)
+                for (const auto& s : PacketNameIdExtractor<AllServerboundConfigurationPackets>::name_ids)
                 {
                     bool ignored = false;
                     for (const auto& v : conf[Conf::configuration_key][Conf::ignored_serverbound_key].get_array())
@@ -860,7 +860,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
             }
 
             ImGui::SeparatorText("Sessions");
-            std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> additional_ignored_packet = { nullptr, ConnectionState::None, Endpoint::Client };
+            std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> additional_ignored_packet = { nullptr, ConnectionState::None, Endpoint::Client };
             {
                 std::scoped_lock<std::mutex> lock(loggers_mutex);
                 if (loggers.size() > 0 && ImGui::BeginTabBar("loggers", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))

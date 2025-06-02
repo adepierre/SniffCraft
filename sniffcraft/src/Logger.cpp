@@ -11,7 +11,7 @@
 #include <string>
 
 #include <protocolCraft/Handler.hpp>
-#include <protocolCraft/MessageFactory.hpp>
+#include <protocolCraft/PacketFactory.hpp>
 
 #ifdef WITH_GUI
 #include <imgui.h>
@@ -82,15 +82,15 @@ Logger::Logger(const std::filesystem::path& path)
         item.origin = static_cast<Endpoint>(static_cast<int>(ReadData<VarInt>(packet_iter, remaining_size)));
         item.date = start_time + std::chrono::milliseconds(ReadData<VarLong>(packet_iter, remaining_size));
         item.bandwidth_bytes = static_cast<size_t>(ReadData<VarLong>(packet_iter, remaining_size));
-        int msg_id = ReadData<VarInt>(packet_iter, remaining_size);
+        int packet_id = ReadData<VarInt>(packet_iter, remaining_size);
         const Endpoint origin = SimpleOrigin(item.origin);
-        item.msg = origin == Endpoint::Server ? CreateClientboundMessage(item.connection_state, msg_id) : CreateServerboundMessage(item.connection_state, msg_id);
-        if (item.msg == nullptr)
+        item.packet = origin == Endpoint::Server ? CreateClientboundPacket(item.connection_state, packet_id) : CreateServerboundPacket(item.connection_state, packet_id);
+        if (item.packet == nullptr)
         {
             std::cerr << "Error loading the binary file. This might be a bug, please report it. Stopping loading here" << std::endl;
             break;
         }
-        item.msg->Read(packet_iter, remaining_size);
+        item.packet->Read(packet_iter, remaining_size);
         if (item.bandwidth_bytes != 0)
         {
             // Update the recaps
@@ -146,7 +146,7 @@ Logger::~Logger()
     }
 }
 
-void Logger::Log(const std::shared_ptr<Message>& msg, const ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes)
+void Logger::Log(const std::shared_ptr<Packet>& packet, const ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes)
 {
     std::lock_guard<std::mutex> log_guard(log_mutex);
     bool need_to_create_txt_file = log_to_file && !log_file.is_open();
@@ -168,7 +168,7 @@ void Logger::Log(const std::shared_ptr<Message>& msg, const ConnectionState conn
         }
     }
 
-    logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin, bandwidth_bytes });
+    logging_queue.push({ packet, std::chrono::system_clock::now(), connection_state, origin, bandwidth_bytes });
     log_condition.notify_all();
 }
 
@@ -208,9 +208,9 @@ std::string GetJsonPath(const Json::Value& json, const size_t byte_offset);
 
 void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title);
 
-std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
+std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
 {
-    std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> return_value = { nullptr, ConnectionState::None, Endpoint::Client };
+    std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> return_value = { nullptr, ConnectionState::None, Endpoint::Client };
     ImGui::PushID(base_filename.c_str());
 
     const float available_width = ImGui::GetContentRegionAvail().x;
@@ -239,19 +239,19 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
                         // (otherwise some offset in the json could match a
                         // different dumped byte)
                         selected_bytes.clear();
-                        item.msg->Write(selected_bytes);
+                        item.packet->Write(selected_bytes);
                         size_t remaining_bytes = selected_bytes.size();
                         ReadIterator iter = selected_bytes.cbegin();
                         // Skip message ID
                         ReadData<VarInt>(iter, remaining_bytes);
-                        std::shared_ptr<Message> cloned = item.msg->CopyTypeOnly();
+                        std::shared_ptr<Packet> cloned = item.packet->CopyTypeOnly();
                         cloned->Read(iter, remaining_bytes);
                         selected_json = cloned->Serialize();
                     }
                 }
                 if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
                 {
-                    ImGui::Text("ID: %i", item.msg->GetId());
+                    ImGui::Text("ID: %i", item.packet->GetId());
                     ImGui::EndTooltip();
                 }
                 ImGui::SameLine();
@@ -259,7 +259,7 @@ std::tuple<std::shared_ptr<Message>, ConnectionState, Endpoint> Logger::Render()
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));;
                 if (ImGui::Button("X", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
                 {
-                    return_value = { item.msg, item.connection_state, SimpleOrigin(item.origin) };
+                    return_value = { item.packet, item.connection_state, SimpleOrigin(item.origin) };
                     if (selected_index == packets_history_filtered_indices[i])
                     {
                         selected_index = -1;
@@ -451,7 +451,7 @@ void Logger::LogConsume()
 
             std::stringstream output;
 
-            if (item.msg == nullptr)
+            if (item.packet == nullptr)
             {
                 output
                     << '['
@@ -504,7 +504,7 @@ void Logger::LogConsume()
                 const long long int time_since_epoch = std::chrono::system_clock::to_time_t(item.date);
                 WriteData<VarLong>(static_cast<long long int>(std::chrono::duration_cast<std::chrono::milliseconds>(item.date - start_time).count()), serialized);
                 WriteData<VarLong>(static_cast<long long int>(item.bandwidth_bytes), serialized);
-                item.msg->Write(serialized);
+                item.packet->Write(serialized);
                 std::vector<unsigned char> serialized_header;
                 WriteData<bool>(serialized.size() > 256, serialized_header);
                 if (serialized.size() > 256)
@@ -527,7 +527,7 @@ void Logger::LogConsume()
             {
                 std::scoped_lock lock(ignored_packets_mutex);
                 const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
-                const bool is_ignored = ignored_set.find(item.msg->GetId()) != ignored_set.end();
+                const bool is_ignored = ignored_set.find(item.packet->GetId()) != ignored_set.end();
                 if (is_ignored)
                 {
                     continue;
@@ -543,7 +543,7 @@ void Logger::LogConsume()
 #endif
 
             const std::set<int>& detailed_set = detailed_packets[{item.connection_state, SimpleOrigin(item.origin)}];
-            const bool is_detailed = detailed_set.find(item.msg->GetId()) != detailed_set.end();
+            const bool is_detailed = detailed_set.find(item.packet->GetId()) != detailed_set.end();
 
             output
                 << '['
@@ -562,7 +562,7 @@ void Logger::LogConsume()
             {
                 output << '\n';
                 std::vector<unsigned char> bytes;
-                item.msg->Write(bytes);
+                item.packet->Write(bytes);
                 for (size_t i = 0; i < bytes.size(); ++i)
                 {
                     output << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(bytes[i]) << (i == bytes.size() - 1 ? "" : " ");
@@ -571,9 +571,9 @@ void Logger::LogConsume()
             if (is_detailed)
             {
 #ifdef WITH_GUI
-                output << "\n" << RemoveParsingDetails(item.msg->Serialize()).Dump(4);
+                output << "\n" << RemoveParsingDetails(item.packet->Serialize()).Dump(4);
 #else
-                output << "\n" << item.msg->Serialize().Dump(4);
+                output << "\n" << item.packet->Serialize().Dump(4);
 #endif
             }
 
@@ -675,7 +675,7 @@ void Logger::LoadConfig()
         for (size_t i = 0; i < packets_history.size(); ++i)
         {
             const std::set<int>& ignored_set = ignored_packets[{packets_history[i].connection_state, SimpleOrigin(packets_history[i].origin)}];
-            const bool is_ignored = ignored_set.find(packets_history[i].msg->GetId()) != ignored_set.end();
+            const bool is_ignored = ignored_set.find(packets_history[i].packet->GetId()) != ignored_set.end();
             if (!is_ignored)
             {
                 packets_history_filtered_indices.push_back(i);
@@ -697,7 +697,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
         case ConnectionState::Handshake:
             return -1;
         case ConnectionState::Status:
-            for (const auto& s : PacketNameIdExtractor<AllClientboundStatusMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllClientboundStatusPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -706,7 +706,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             }
             return -1;
         case ConnectionState::Login:
-            for (const auto& s : PacketNameIdExtractor<AllClientboundLoginMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllClientboundLoginPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -715,7 +715,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             }
             return -1;
         case ConnectionState::Play:
-            for (const auto& s : PacketNameIdExtractor<AllClientboundPlayMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllClientboundPlayPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -725,7 +725,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             return -1;
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
         case ConnectionState::Configuration:
-            for (const auto& s : PacketNameIdExtractor<AllClientboundConfigurationMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllClientboundConfigurationPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -743,7 +743,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
         case ConnectionState::None:
             return -1;
         case ConnectionState::Handshake:
-            for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakingMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllServerboundHandshakingPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -752,7 +752,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             }
             return -1;
         case ConnectionState::Status:
-            for (const auto& s : PacketNameIdExtractor<AllServerboundStatusMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllServerboundStatusPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -761,7 +761,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             }
             return -1;
         case ConnectionState::Login:
-            for (const auto& s : PacketNameIdExtractor<AllServerboundLoginMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllServerboundLoginPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -770,7 +770,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             }
             return -1;
         case ConnectionState::Play:
-            for (const auto& s : PacketNameIdExtractor<AllServerboundPlayMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllServerboundPlayPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -780,7 +780,7 @@ int GetIdFromName(const std::string& name, const ConnectionState connection_stat
             return -1;
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
         case ConnectionState::Configuration:
-            for (const auto& s : PacketNameIdExtractor<AllServerboundConfigurationMessages>::name_ids)
+            for (const auto& s : PacketNameIdExtractor<AllServerboundConfigurationPackets>::name_ids)
             {
                 if (s.name == name)
                 {
@@ -929,40 +929,40 @@ std::string_view Logger::ConnectionStateToString(const ConnectionState connectio
 std::string Logger::GetPacketName(const LogItem& item) const
 {
     const Endpoint simple_origin = SimpleOrigin(item.origin);
-    const std::string packet_name(item.msg->GetName());
+    const std::string packet_name(item.packet->GetName());
     switch (item.connection_state)
     {
     case ConnectionState::Play:
-        if (simple_origin == Endpoint::Server && item.msg->GetId() == Internal::get_tuple_index<ClientboundCustomPayloadPacket, AllClientboundPlayMessages>)
+        if (simple_origin == Endpoint::Server && item.packet->GetId() == Internal::get_tuple_index<ClientboundCustomPayloadPacket, AllClientboundPlayPackets>)
         {
-            std::shared_ptr<ClientboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadPacket>(item.msg);
+            std::shared_ptr<ClientboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadPacket>(item.packet);
             return packet_name + '|' + custom_payload->GetIdentifier();
         }
-        else if (simple_origin == Endpoint::Client && item.msg->GetId() == Internal::get_tuple_index<ServerboundCustomPayloadPacket, AllServerboundPlayMessages>)
+        else if (simple_origin == Endpoint::Client && item.packet->GetId() == Internal::get_tuple_index<ServerboundCustomPayloadPacket, AllServerboundPlayPackets>)
         {
-            std::shared_ptr<ServerboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadPacket>(item.msg);
+            std::shared_ptr<ServerboundCustomPayloadPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadPacket>(item.packet);
             return packet_name + '|' + custom_payload->GetIdentifier();
         }
         break;
 #if PROTOCOL_VERSION > 763 /* > 1.20.1 */
     case ConnectionState::Configuration:
-        if (simple_origin == Endpoint::Server && item.msg->GetId() == Internal::get_tuple_index<ClientboundCustomPayloadConfigurationPacket, AllClientboundConfigurationMessages>)
+        if (simple_origin == Endpoint::Server && item.packet->GetId() == Internal::get_tuple_index<ClientboundCustomPayloadConfigurationPacket, AllClientboundConfigurationPackets>)
         {
-            std::shared_ptr<ClientboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadConfigurationPacket>(item.msg);
+            std::shared_ptr<ClientboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomPayloadConfigurationPacket>(item.packet);
             return packet_name + '|' + custom_payload->GetIdentifier();
         }
-        else if (simple_origin == Endpoint::Client && item.msg->GetId() == Internal::get_tuple_index<ServerboundCustomPayloadConfigurationPacket, AllServerboundConfigurationMessages>)
+        else if (simple_origin == Endpoint::Client && item.packet->GetId() == Internal::get_tuple_index<ServerboundCustomPayloadConfigurationPacket, AllServerboundConfigurationPackets>)
         {
-            std::shared_ptr<ServerboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadConfigurationPacket>(item.msg);
+            std::shared_ptr<ServerboundCustomPayloadConfigurationPacket> custom_payload = std::dynamic_pointer_cast<ServerboundCustomPayloadConfigurationPacket>(item.packet);
             return packet_name + '|' + custom_payload->GetIdentifier();
         }
         break;
 #endif
 #if PROTOCOL_VERSION > 340 /* > 1.12.2 */
     case ConnectionState::Login:
-        if (simple_origin == Endpoint::Server && item.msg->GetId() == Internal::get_tuple_index<ClientboundCustomQueryPacket, AllClientboundLoginMessages>)
+        if (simple_origin == Endpoint::Server && item.packet->GetId() == Internal::get_tuple_index<ClientboundCustomQueryPacket, AllClientboundLoginPackets>)
         {
-            std::shared_ptr<ClientboundCustomQueryPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomQueryPacket>(item.msg);
+            std::shared_ptr<ClientboundCustomQueryPacket> custom_payload = std::dynamic_pointer_cast<ClientboundCustomQueryPacket>(item.packet);
             return packet_name + '|' + custom_payload->GetIdentifier().GetFull();
         }
         break;

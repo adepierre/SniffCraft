@@ -36,7 +36,7 @@ ReplayModLogger::~ReplayModLogger()
     }
 }
 
-void ReplayModLogger::Log(const std::shared_ptr<Message> msg, const ConnectionState connection_state, const Endpoint origin)
+void ReplayModLogger::Log(const std::shared_ptr<Packet> packet, const ConnectionState connection_state, const Endpoint origin)
 {
     if (!is_running)
     {
@@ -55,7 +55,7 @@ void ReplayModLogger::Log(const std::shared_ptr<Message> msg, const ConnectionSt
         replay_file = std::ofstream(session_prefix + "_recording.tmcpr", std::ios::out | std::ios::binary);
     }
 
-    logging_queue.push({ msg, std::chrono::system_clock::now(), connection_state, origin });
+    logging_queue.push({ packet, std::chrono::system_clock::now(), connection_state, origin });
     log_condition.notify_all();
 }
 
@@ -85,7 +85,7 @@ void ReplayModLogger::LogConsume()
             {
                 std::vector<unsigned char> packet;
                 // Write ID + Packet data
-                item.msg->Write(packet);
+                item.packet->Write(packet);
 
                 // Get timestamp in ms
                 std::vector<unsigned char> header;
@@ -105,12 +105,12 @@ void ReplayModLogger::SaveReplayMetadataFile() const
     std::ofstream metadata(session_prefix + "_metaData.json", std::ios::out);
     auto now = std::chrono::system_clock::now();
 
-    metadata << "{\"singleplayer\":false," 
+    metadata << "{\"singleplayer\":false,"
              << "\"serverName\":\"" << server_name << "\","
              << "\"duration\":" << std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() << ","
              << "\"date\":" << std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() << ","
-             << "\"fileFormat\":\"MCPR\"," 
-             << "\"fileFormatVersion\":14," 
+             << "\"fileFormat\":\"MCPR\","
+             << "\"fileFormatVersion\":14,"
              << "\"protocol\":\"" << PROTOCOL_VERSION << "\","
              << "\"generator\":\"SniffCraft\"}";
     metadata.close();

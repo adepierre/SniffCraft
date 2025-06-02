@@ -5,7 +5,7 @@
 #include "sniffcraft/NetworkRecapItem.hpp"
 
 #include <protocolCraft/enums.hpp>
-#include <protocolCraft/Message.hpp>
+#include <protocolCraft/Packet.hpp>
 #include <protocolCraft/Utilities/Json.hpp>
 
 #include <atomic>
@@ -29,14 +29,14 @@ public:
     Logger(const std::filesystem::path& path);
 #endif
     ~Logger();
-    void Log(const std::shared_ptr<ProtocolCraft::Message>& msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes);
+    void Log(const std::shared_ptr<ProtocolCraft::Packet>& packet, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin, const size_t bandwidth_bytes);
     const std::string& GetBaseFilename() const;
     void LoadConfig();
     void Stop();
 #ifdef WITH_GUI
     /// @brief Render this Logger packets
     /// @return A tuple <message, connection state, origin> to add to ignored, if first element is nullptr, nothing to add
-    std::tuple<std::shared_ptr<ProtocolCraft::Message>, ProtocolCraft::ConnectionState, Endpoint> Render();
+    std::tuple<std::shared_ptr<ProtocolCraft::Packet>, ProtocolCraft::ConnectionState, Endpoint> Render();
 #endif
 
 private:

@@ -4,7 +4,7 @@
 #include "sniffcraft/LogItem.hpp"
 
 #include <protocolCraft/enums.hpp>
-#include <protocolCraft/Message.hpp>
+#include <protocolCraft/Packet.hpp>
 
 #include <thread>
 #include <mutex>
@@ -21,7 +21,7 @@ class ReplayModLogger
 public:
     ReplayModLogger();
     ~ReplayModLogger();
-    void Log(const std::shared_ptr<ProtocolCraft::Message> msg, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin);
+    void Log(const std::shared_ptr<ProtocolCraft::Packet> packet, const ProtocolCraft::ConnectionState connection_state, const Endpoint origin);
     void SetServerName(const std::string& server_name_);
 
 private:
