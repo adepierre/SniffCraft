@@ -37,7 +37,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install -y xorg-dev
+          sudo apt install -y libwayland-dev libxkbcommon-dev xorg-dev
 
       - name: Create build folder
         run: cmake -E make_directory ${{ runner.workspace }}/build
