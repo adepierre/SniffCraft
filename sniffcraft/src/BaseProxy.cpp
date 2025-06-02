@@ -29,11 +29,10 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
 
     // Try to connect to remote server
     asio::ip::tcp::resolver resolver(io_context_);
-    asio::ip::tcp::resolver::query query(server_ip_, std::to_string(server_port_));
-    asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
-    
+    asio::ip::tcp::resolver::results_type results = resolver.resolve(server_ip_, std::to_string(server_port_));
+
     asio::error_code ec;
-    asio::connect(server_connection.GetSocket(), iterator, ec);
+    asio::connect(server_connection.GetSocket(), results, ec);
 
     if (ec)
     {

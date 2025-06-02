@@ -162,7 +162,7 @@ void Server::ResolveIpPortFromAddress()
     std::vector<unsigned char> encoded_query;
     query.Write(encoded_query);
     udp_socket.open(asio::ip::udp::v4());
-    asio::ip::udp::endpoint endpoint(asio::ip::address::from_string("8.8.8.8"), 53);
+    asio::ip::udp::endpoint endpoint(asio::ip::make_address("8.8.8.8"), 53);
     udp_socket.send_to(asio::buffer(encoded_query), endpoint);
 
     // Wait for the answer

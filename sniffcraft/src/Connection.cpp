@@ -41,7 +41,7 @@ void Connection::StartListeningAndWriting()
     {
 
     }
-    timeout_timer.expires_from_now(std::chrono::seconds(15));
+    timeout_timer.expires_after(std::chrono::seconds(15));
     timeout_timer.async_wait(
         std::bind(&Connection::handle_timeout, this, std::placeholders::_1)
     );
@@ -170,7 +170,7 @@ void Connection::handle_read(const asio::error_code& ec, const size_t bytes_tran
     }
 
     timeout_timer.cancel();
-    timeout_timer.expires_from_now(std::chrono::seconds(15));
+    timeout_timer.expires_after(std::chrono::seconds(15));
     timeout_timer.async_wait(
         std::bind(&Connection::handle_timeout, this, std::placeholders::_1)
     );
