@@ -1,5 +1,6 @@
 ![Build status](https://github.com/adepierre/Sniffcraft/actions/workflows/automatic_release.yml/badge.svg)
 [![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/wECVsTbjA9)
+[![Youtube](https://badgen.net/badge/Youtube/tutorial?color=FF0000)](https://youtu.be/wXOD41jI_Rg)
 
 # SniffCraft
 
