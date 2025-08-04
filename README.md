@@ -35,8 +35,7 @@ It works as a man-in-the-middle: instead of connecting directly to the server, y
 - Save full session to binary file and reopen them later in the GUI
 - Creating a [replay mod](https://github.com/ReplayMod/ReplayMod) capture of the session is also possible, see [Replay Mod section](#replay-mod) for more details
 - No log at all is possible, in this case, SniffCraft becomes a pure proxy that you can adapt to block/modify any packet you want
-
-1.20.5 transfer packet is **not** supported yet.
+- 1.20.5+ transfer packets are now supported
 
 <img width="750" src="https://github.com/user-attachments/assets/49d46827-2001-4607-8b6b-b496c73f95bc" alt="Sniffcraft GUI" align="center">
 

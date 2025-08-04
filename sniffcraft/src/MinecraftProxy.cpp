@@ -23,10 +23,18 @@
 
 using namespace ProtocolCraft;
 
-MinecraftProxy::MinecraftProxy(asio::io_context& io_context) : BaseProxy(io_context)
+MinecraftProxy::MinecraftProxy(
+    asio::io_context& io_context,
+    std::function<void(const std::string&, const int)> transfer_callback_
+) : BaseProxy(io_context)
 {
     connection_state = ConnectionState::Handshake;
     compression_threshold = -1;
+
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+    // If it's a version with transfer packet, store the callback
+    transfer_callback = transfer_callback_;
+#endif
 }
 
 MinecraftProxy::~MinecraftProxy()
@@ -218,10 +226,31 @@ void MinecraftProxy::Handle(ServerboundClientIntentionPacket& packet)
             << "). Logged packet details may be wrong"
             << std::endl;
     }
+
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+    // Store original hostname and port (used by the client to connect to sniffcraft)
+    // They could be needed later for any transfer packet
+    sniffcraft_hostname = packet.GetHostName();
+    sniffcraft_port = packet.GetPort();
+#endif
     transmit_original_packet = false;
 
     const ConnectionState old_connection_state = connection_state;
-    connection_state = static_cast<ConnectionState>(packet.GetIntention());
+    switch (packet.GetIntention())
+    {
+    case 1: // Status
+        connection_state = ConnectionState::Status;
+        break;
+    case 2: // Login
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+    case 3: // Transfer
+#endif
+        connection_state = ConnectionState::Login;
+        break;
+    default:
+        throw std::runtime_error("Unknown connection intent: " + std::to_string(packet.GetIntention()));
+        break;
+    }
 
     std::shared_ptr<ServerboundClientIntentionPacket> replacement_intention_packet = std::make_shared<ServerboundClientIntentionPacket>();
     replacement_intention_packet->SetIntention(packet.GetIntention());
@@ -522,5 +551,33 @@ void MinecraftProxy::Handle(ServerboundFinishConfigurationPacket& packet)
 void MinecraftProxy::Handle(ServerboundConfigurationAcknowledgedPacket& packet)
 {
     connection_state = ConnectionState::Configuration;
+}
+#endif
+
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+void MinecraftProxy::Handle(ClientboundTransferConfigurationPacket& packet)
+{
+    transfer_callback(packet.GetHost(), packet.GetPort());
+    transmit_original_packet = false;
+    std::shared_ptr<ClientboundTransferConfigurationPacket> replacement_transfer_packet = std::make_shared<ClientboundTransferConfigurationPacket>();
+    replacement_transfer_packet->SetHost(sniffcraft_hostname);
+    replacement_transfer_packet->SetPort(sniffcraft_port);
+    const std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_transfer_packet);
+    client_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(replacement_transfer_packet, connection_state, Endpoint::SniffcraftToClient, 0);
+}
+
+void MinecraftProxy::Handle(ClientboundTransferPacket& packet)
+{
+    transfer_callback(packet.GetHost(), packet.GetPort());
+    transmit_original_packet = false;
+    std::shared_ptr<ClientboundTransferPacket> replacement_transfer_packet = std::make_shared<ClientboundTransferPacket>();
+    replacement_transfer_packet->SetHost(sniffcraft_hostname);
+    replacement_transfer_packet->SetPort(sniffcraft_port);
+    const std::vector<unsigned char> replacement_bytes = PacketToBytes(*replacement_transfer_packet);
+    client_connection.WriteData(replacement_bytes.data(), replacement_bytes.size());
+    // We don't log packet size as it's not really part of the network data
+    logger->Log(replacement_transfer_packet, connection_state, Endpoint::SniffcraftToClient, 0);
 }
 #endif

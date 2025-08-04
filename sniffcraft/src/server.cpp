@@ -1,6 +1,6 @@
 #include "sniffcraft/conf.hpp"
-#include "sniffcraft/MinecraftProxy.hpp"
 #include "sniffcraft/Logger.hpp"
+#include "sniffcraft/MinecraftProxy.hpp"
 #include "sniffcraft/PacketUtilities.hpp"
 #include "sniffcraft/server.hpp"
 
@@ -9,8 +9,8 @@
 #include <botcraft/Utilities/StringUtilities.hpp>
 
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <utility>
 
@@ -32,6 +32,7 @@ Server::Server()
     ResolveIpPortFromAddress();
 
     proxies_cleaning_thread = std::thread(&Server::CleanProxies, this);
+    is_next_connection_transfer = false;
 }
 
 Server::~Server()
@@ -88,7 +89,17 @@ void Server::handle_accept(BaseProxy* new_proxy, const asio::error_code& ec)
 {
     if (!ec)
     {
-        new_proxy->Start(server_ip, server_port);
+        if (is_next_connection_transfer)
+        {
+            is_next_connection_transfer = false;
+            new_proxy->Start(transfer_ip, transfer_port);
+            transfer_ip = "";
+            transfer_port = 0;
+        }
+        else
+        {
+            new_proxy->Start(server_ip, server_port);
+        }
 #ifdef WITH_GUI
         if (MinecraftProxy* casted_proxy = dynamic_cast<MinecraftProxy*>(new_proxy))
         {
@@ -203,11 +214,21 @@ void Server::ResolveIpPortFromAddress()
     server_ip = addressOnly;
 }
 
+void Server::PrepareForTransfer(const std::string& new_ip, const int new_port)
+{
+    is_next_connection_transfer = true;
+    transfer_ip = new_ip;
+    transfer_port = new_port;
+}
+
 BaseProxy* Server::GetNewMinecraftProxy()
 {
     std::lock_guard<std::mutex> lock(proxies_mutex);
     // Create a new proxy
-    std::unique_ptr<BaseProxy> proxy = std::make_unique<MinecraftProxy>(io_context);
+    std::unique_ptr<BaseProxy> proxy = std::make_unique<MinecraftProxy>(
+        io_context,
+        std::bind(&Server::PrepareForTransfer, this, std::placeholders::_1, std::placeholders::_2)
+    );
     proxies.push_back(std::move(proxy));
 
     return proxies.back().get();

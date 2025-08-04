@@ -8,8 +8,6 @@
 
 #include <asio.hpp>
 
-#include "protocolCraft/Utilities/Json.hpp"
-
 class BaseProxy;
 #ifdef WITH_GUI
 struct GLFWwindow;
@@ -28,6 +26,7 @@ private:
     void listen_connection();
     void handle_accept(BaseProxy* new_proxy, const asio::error_code &ec);
     void ResolveIpPortFromAddress();
+    void PrepareForTransfer(const std::string& new_ip, const int new_port);
 
     BaseProxy* GetNewMinecraftProxy();
     void CleanProxies();
@@ -42,6 +41,10 @@ private:
     std::string server_ip;
     unsigned short server_port;
     unsigned short client_port;
+
+    bool is_next_connection_transfer;
+    std::string transfer_ip;
+    unsigned short transfer_port;
 
     asio::io_context io_context;
     std::unique_ptr<asio::ip::tcp::acceptor> acceptor;

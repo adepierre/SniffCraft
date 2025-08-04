@@ -21,7 +21,10 @@ class ReplayModLogger;
 class MinecraftProxy : public BaseProxy, public ProtocolCraft::Handler
 {
 public:
-    MinecraftProxy(asio::io_context& io_context);
+    MinecraftProxy(
+        asio::io_context& io_context,
+        std::function<void(const std::string&, const int)> transfer_callback_
+    );
     virtual ~MinecraftProxy();
 
     virtual void Start(const std::string& server_address, const unsigned short server_port) override;
@@ -65,8 +68,21 @@ private:
     virtual void Handle(ProtocolCraft::ServerboundFinishConfigurationPacket& packet) override;
     virtual void Handle(ProtocolCraft::ServerboundConfigurationAcknowledgedPacket& packet) override;
 #endif
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+    virtual void Handle(ProtocolCraft::ClientboundTransferConfigurationPacket& packet) override;
+    virtual void Handle(ProtocolCraft::ClientboundTransferPacket& packet) override;
+#endif
 
 private:
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+    // Hostname and port the real client used to connect to sniffcraft
+    // (replaced by the server address and port by sniffcraft)
+    std::string sniffcraft_hostname;
+    int sniffcraft_port;
+    // Callback function to handle transfer packets
+    std::function<void(const std::string&, const int)> transfer_callback;
+#endif
+
     std::shared_ptr<Logger> logger;
     std::unique_ptr<ReplayModLogger> replay_logger;
 
