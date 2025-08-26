@@ -206,7 +206,7 @@ Json::Value RemoveParsingDetails(const Json::Value& val);
 /// @return A json path as a string
 std::string GetJsonPath(const Json::Value& json, const size_t byte_offset);
 
-void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title);
+void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title, const float running_time_s, bool& display_bandwidth_per_s, bool& display_count_per_s);
 
 std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
 {
@@ -413,9 +413,15 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
 
     {
         std::scoped_lock<std::mutex> lock(network_recap_mutex);
-        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Server --> Client");
+        const float running_s =
+            is_running ?
+            static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count()) / 1000.0f :
+            packets_history.empty() ?
+                1.0f :
+                static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(packets_history.back().date - start_time).count()) / 1000.0f;
+        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Server --> Client", running_s, bandwidth_per_s_clientbound, count_per_s_clientbound);
         ImGui::SameLine();
-        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Client --> Server");
+        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Client --> Server", running_s, bandwidth_per_s_serverbound, count_per_s_serverbound);
     }
 
     ImGui::PopID();
@@ -1629,7 +1635,7 @@ std::string GetJsonPath(const Json::Value& json, const size_t byte_offset)
     return "";
 }
 
-void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title)
+void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title, const float running_time_s, bool& display_bandwidth_per_s, bool& display_count_per_s)
 {
     char buffer_count[30];
     char buffer_bandwidth[30];
@@ -1641,11 +1647,19 @@ void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, cons
     )
     {
         ImGui::TableSetupColumn(table_title.c_str(), ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
-        ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed, 0.0f, 1);
-        ImGui::TableSetupColumn("Bandwidth", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed, 0.0f, 2);
+        ImGui::TableSetupColumn("Count   per s", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed, 0.0f, 1);
+        ImGui::TableSetupColumn("Bandwidth   per s", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed, 0.0f, 2);
 
         ImGui::TableSetupScrollFreeze(0, 2);
         ImGui::TableHeadersRow();
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SameLine(ImGui::CalcTextSize("Count ").x);
+        ImGui::Checkbox("##count_per_s", &display_count_per_s);
+        ImGui::TableSetColumnIndex(2);
+        ImGui::SameLine(ImGui::CalcTextSize("Bandwidth ").x);
+        ImGui::Checkbox("##bandwidth_per_s", &display_bandwidth_per_s);
+        ImGui::PopStyleVar();
 
         // Always display total line first
         ImGui::PushID("total");
@@ -1653,13 +1667,27 @@ void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, cons
         ImGui::TableNextColumn();
         ImGui::TextUnformatted("Total");
         ImGui::TableNextColumn();
-        std::sprintf(buffer_count, "%llu (%6.2f%%)", total.count, 100.0f);
+        if (display_count_per_s)
+        {
+            std::sprintf(buffer_count, "%.2f (%6.2f%%)", static_cast<float>(total.count) / running_time_s, 100.0f);
+        }
+        else
+        {
+            std::sprintf(buffer_count, "%llu (%6.2f%%)", total.count, 100.0f);
+        }
         // Right align in the column
         ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_count).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
         ImGui::SameLine();
         ImGui::TextUnformatted(buffer_count);
         ImGui::TableNextColumn();
-        std::sprintf(buffer_bandwidth, "%llu (%6.2f%%)", total.bandwidth_bytes, 100.0f);
+        if (display_bandwidth_per_s)
+        {
+            std::sprintf(buffer_bandwidth, "%.2f (%6.2f%%)", static_cast<float>(total.bandwidth_bytes) / running_time_s, 100.0f);
+        }
+        else
+        {
+            std::sprintf(buffer_bandwidth, "%llu (%6.2f%%)", total.bandwidth_bytes, 100.0f);
+        }
         // Right align in the column
         ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_bandwidth).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
         ImGui::SameLine();
@@ -1757,13 +1785,27 @@ void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, cons
                     ImGui::EndTooltip();
                 }
                 ImGui::TableNextColumn();
-                std::sprintf(buffer_count, "%llu (%6.2f%%)", it->second.count, (100.0f * it->second.count) / total.count);
+                if (display_count_per_s)
+                {
+                    std::sprintf(buffer_count, "%.2f (%6.2f%%)", static_cast<float>(it->second.count) / running_time_s, (100.0f * it->second.count) / total.count);
+                }
+                else
+                {
+                    std::sprintf(buffer_count, "%llu (%6.2f%%)", it->second.count, (100.0f * it->second.count) / total.count);
+                }
                 // Right align in the column
                 ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_count).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
                 ImGui::SameLine();
                 ImGui::TextUnformatted(buffer_count);
                 ImGui::TableNextColumn();
-                std::sprintf(buffer_bandwidth, "%llu (%6.2f%%)", it->second.bandwidth_bytes, (100.0f * it->second.bandwidth_bytes) / total.bandwidth_bytes);
+                if (display_bandwidth_per_s)
+                {
+                    std::sprintf(buffer_bandwidth, "%.2f (%6.2f%%)", static_cast<float>(it->second.bandwidth_bytes) / running_time_s, (100.0f * it->second.bandwidth_bytes) / total.bandwidth_bytes);
+                }
+                else
+                {
+                    std::sprintf(buffer_bandwidth, "%llu (%6.2f%%)", it->second.bandwidth_bytes, (100.0f * it->second.bandwidth_bytes) / total.bandwidth_bytes);
+                }
                 // Right align in the column
                 ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetColumnWidth() - ImGui::CalcTextSize(buffer_bandwidth).x - ImGui::GetStyle().ItemSpacing.x), ImGui::GetTextLineHeightWithSpacing()));
                 ImGui::SameLine();

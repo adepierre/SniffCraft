@@ -93,5 +93,9 @@ private:
     long long int selected_index = -1;
     std::vector<unsigned char> selected_bytes;
     ProtocolCraft::Json::Value selected_json;
+    bool count_per_s_clientbound = false;
+    bool count_per_s_serverbound = false;
+    bool bandwidth_per_s_clientbound = false;
+    bool bandwidth_per_s_serverbound = false;
 #endif
 };
