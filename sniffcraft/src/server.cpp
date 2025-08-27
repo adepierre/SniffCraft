@@ -265,7 +265,7 @@ void Server::Render()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
     GLFWwindow* window = glfwCreateWindow(1200, 960, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
@@ -332,9 +332,6 @@ void HelpMarker(const char* tooltip);
 
 void Server::InternalRenderLoop(GLFWwindow* window)
 {
-    int width, height;
-    glfwGetWindowSize(window, &width, &height);
-
     // A bunch of variables used as display data during one frame
     // App parameters
     bool started = false;
@@ -622,10 +619,9 @@ void Server::InternalRenderLoop(GLFWwindow* window)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
         {
             ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(ImVec2(static_cast<float>(width), static_cast<float>(height)));
+            ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
 
             ImGui::Begin("SniffCraft Main Window", NULL,
                 ImGuiWindowFlags_NoResize |
@@ -642,7 +638,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 ImGui::SameLine();
                 HelpMarker("Server address, as you would enter it in a minecraft client");
                 ImGui::SameLine();
-                ImGui::SetNextItemWidth(500.0f);
+                ImGui::SetNextItemWidth(0.7f * ImGui::GetContentRegionAvail().x);
                 ImGui::InputText("##server_address", &server_address);
                 if (ImGui::IsItemDeactivatedAfterEdit())
                 {
@@ -654,7 +650,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
 
                 ImGui::BeginDisabled(started);
-                ImGui::SameLine(0.0f, 10.0f);
+                float current_x = ImGui::GetItemRectMax().x;
+                // Stay on this line only if it fits
+                if (
+                    current_x +
+                    ImGui::CalcTextSize("Local port").x +
+                    ImGui::CalcTextSize("25555").x +
+                    ImGui::CalcTextSize("(?)").x +
+                    3 * ImGui::GetStyle().ItemSpacing.x < ImGui::GetContentRegionAvail().x
+                )
+                {
+                    ImGui::SameLine(0.0f, 10.0f);
+                }
                 ImGui::TextUnformatted("Local port");
                 ImGui::SameLine();
                 HelpMarker("Local port clients will use to connect to this Sniffcraft instance, should be between 1024 and 65535");
@@ -712,7 +719,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 ImGui::SameLine();
                 HelpMarker("If checked, logs will be printed in the console");
-                ImGui::SameLine(0.0f, 10.0f);
+                current_x = ImGui::GetItemRectMax().x;
+                // Stay on this line only if it fits
+                if (
+                    current_x +
+                    ImGui::CalcTextSize("Network recap").x +
+                    ImGui::CalcTextSize("(?)").x +
+                    ImGui::GetFrameHeight() +
+                    2 * ImGui::GetStyle().ItemSpacing.x < ImGui::GetContentRegionAvail().x
+                    )
+                {
+                    ImGui::SameLine(0.0f, 10.0f);
+                }
                 if (ImGui::Checkbox("Network recap", &network_recap_to_console))
                 {
                     std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);
@@ -722,7 +740,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 ImGui::SameLine();
                 HelpMarker("If checked, a network usage recap will be printed in the console every ~10 seconds");
-                ImGui::SameLine(0.0f, 10.0f);
+                current_x = ImGui::GetItemRectMax().x;
+                // Stay on this line only if it fits
+                if (
+                    current_x +
+                    ImGui::CalcTextSize("Raw bytes").x +
+                    ImGui::CalcTextSize("(?)").x +
+                    ImGui::GetFrameHeight() +
+                    2 * ImGui::GetStyle().ItemSpacing.x < ImGui::GetContentRegionAvail().x
+                    )
+                {
+                    ImGui::SameLine(0.0f, 10.0f);
+                }
                 if (ImGui::Checkbox("Raw bytes", &log_raw_bytes))
                 {
                     std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);
@@ -732,7 +761,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 ImGui::SameLine();
                 HelpMarker("If checked, raw bytes will be added in the console and text file");
-                ImGui::SameLine(0.0f, 10.0f);
+                current_x = ImGui::GetItemRectMax().x;
+                // Stay on this line only if it fits
+                if (
+                    current_x +
+                    ImGui::CalcTextSize("Text file").x +
+                    ImGui::CalcTextSize("(?)").x +
+                    ImGui::GetFrameHeight() +
+                    2 * ImGui::GetStyle().ItemSpacing.x < ImGui::GetContentRegionAvail().x
+                    )
+                {
+                    ImGui::SameLine(0.0f, 10.0f);
+                }
                 if (ImGui::Checkbox("Text file", &log_to_text_file))
                 {
                     std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);
@@ -742,7 +782,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 ImGui::SameLine();
                 HelpMarker("If checked, logs will be sent to a text file");
-                ImGui::SameLine(0.0f, 10.0f);
+                current_x = ImGui::GetItemRectMax().x;
+                // Stay on this line only if it fits
+                if (
+                    current_x +
+                    ImGui::CalcTextSize("Binary file").x +
+                    ImGui::CalcTextSize("(?)").x +
+                    ImGui::GetFrameHeight() +
+                    2 * ImGui::GetStyle().ItemSpacing.x < ImGui::GetContentRegionAvail().x
+                    )
+                {
+                    ImGui::SameLine(0.0f, 10.0f);
+                }
                 if (ImGui::Checkbox("Binary file", &log_to_bin_file))
                 {
                     std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);
@@ -752,7 +803,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 ImGui::SameLine();
                 HelpMarker("If checked, packets will be saved in a binary file that can be reimported into Sniffcraft GUI");
-                ImGui::SameLine(0.0f, 10.0f);
+                current_x = ImGui::GetItemRectMax().x;
+                // Stay on this line only if it fits
+                if (
+                    current_x +
+                    ImGui::CalcTextSize("Replay file").x +
+                    ImGui::CalcTextSize("(?)").x +
+                    ImGui::GetFrameHeight() +
+                    2 * ImGui::GetStyle().ItemSpacing.x < ImGui::GetContentRegionAvail().x
+                    )
+                {
+                    ImGui::SameLine(0.0f, 10.0f);
+                }
                 if (ImGui::Checkbox("Replay file", &log_to_replay_file))
                 {
                     std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);

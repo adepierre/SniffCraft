@@ -220,8 +220,15 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
     ImGuiStyle& style = ImGui::GetStyle();
     std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> return_value = { nullptr, ConnectionState::None, Endpoint::Client };
     ImGui::PushID(base_filename.c_str());
-    const float available_width = ImGui::GetContentRegionAvail().x;
-    if (ImGui::BeginChild("##packet_names_group", ImVec2(0.4f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground))
+    const ImVec2 available_space = ImGui::GetContentRegionAvail();
+    const float min_table_content_width =
+        ImGui::CalcTextSize("0000000000").x +
+        8 * ImGui::CalcTextSize("00").x +
+        ImGui::CalcTextSize("00000000").x +
+        ImGui::GetStyle().CellPadding.x * 20 +
+        9.0f /* needed, why ? Size of the borders ? */;
+    const float table_width = std::min(0.3f * (available_space.x - 2.0f * ImGui::GetStyle().ItemSpacing.x), min_table_content_width + 2.0f * ImGui::GetStyle().FramePadding.x + ImGui::GetStyle().ScrollbarSize);
+    if (ImGui::BeginChild("##packet_names_group", ImVec2(0.55f * (available_space.x - 2.0 * ImGui::GetStyle().ItemSpacing.x - table_width), 0.55f * (available_space.y - ImGui::GetStyle().ItemSpacing.y)), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground))
     {
         ImGui::SetNextItemWidth(
             ImGui::GetContentRegionAvail().x
@@ -341,7 +348,7 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
 
     std::pair<bool, std::pair<size_t, size_t>> hovered_bytes = { false, { 0, 0 } };
     ImGui::SameLine();
-    ImGui::BeginChild("##json_display", ImVec2(0.3f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::BeginChild("##json_display", ImVec2(0.45f * (available_space.x - 2.0 * ImGui::GetStyle().ItemSpacing.x - table_width), 0.55f * (available_space.y - ImGui::GetStyle().ItemSpacing.y)), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
     if (selected_index != -1)
     {
         hovered_bytes = RenderJson(selected_json, selected_bytes.size(), 0, 0);
@@ -355,94 +362,105 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
     ImGui::EndChild();
 
     ImGui::SameLine();
-    ImGui::BeginChild("##bytes_display", ImVec2(0.3f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
-    if (ImGui::BeginTable("##bytes_table", 10, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_NoClip))
+    ImGui::BeginChild("##bytes_display", ImVec2(table_width, 0.55f * (available_space.y - ImGui::GetStyle().ItemSpacing.y)), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar);
+    if (selected_index != -1)
     {
-        ImGui::TableSetupColumn("##row_index", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("0000000000").x);
-        for (int col = 1; col < 9; ++col)
+        if (ImGui::BeginTable(
+            "##bytes_table",
+            10,
+            ImGuiTableFlags_RowBg |
+            ImGuiTableFlags_BordersOuter |
+            ImGuiTableFlags_BordersInnerV |
+            ImGuiTableFlags_NoClip,
+            ImVec2(min_table_content_width, 0.0f)
+        ))
         {
-            ImGui::TableSetupColumn(("##byte_" + std::to_string(col)).c_str(), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("00").x);
-        }
-        ImGui::TableSetupColumn("##string_representation", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("00000000").x);
-
-        ImGuiListClipper clipper;
-        clipper.Begin(static_cast<int>(std::ceil(static_cast<double>(selected_bytes.size()) / 8.0)));
-        while (clipper.Step())
-        {
-            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
+            ImGui::TableSetupColumn("##row_index", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("0000000000").x);
+            for (int col = 1; col < 9; ++col)
             {
-                ImGui::TableNextRow();
-                for (int column = 0; column < 10; column++)
+                ImGui::TableSetupColumn(("##byte_" + std::to_string(col)).c_str(), ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("00").x);
+            }
+            ImGui::TableSetupColumn("##string_representation", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("00000000").x);
+
+            ImGuiListClipper clipper;
+            clipper.Begin(static_cast<int>(std::ceil(static_cast<double>(selected_bytes.size()) / 8.0)));
+            while (clipper.Step())
+            {
+                for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
                 {
-                    ImGui::TableSetColumnIndex(column);
-                    if (column == 0)
+                    ImGui::TableNextRow();
+                    for (int column = 0; column < 10; column++)
                     {
-                        ImGui::Text("%010s", std::to_string(row * 8).c_str());
-                    }
-                    else if (column == 9)
-                    {
-                        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-                        std::string str_repr = ".";
-                        for (size_t i = 0; i < 8; ++i)
+                        ImGui::TableSetColumnIndex(column);
+                        if (column == 0)
                         {
-                            const size_t index = row * 8 + i;
+                            ImGui::Text("%010s", std::to_string(row * 8).c_str());
+                        }
+                        else if (column == 9)
+                        {
+                            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+                            std::string str_repr = ".";
+                            for (size_t i = 0; i < 8; ++i)
+                            {
+                                const size_t index = row * 8 + i;
+                                const size_t index_offset = selected_bytes.size() - index;
+                                if (index < selected_bytes.size())
+                                {
+                                    str_repr[0] = std::isprint(selected_bytes[index]) ? static_cast<char>(selected_bytes[index]) : '.';
+                                    ImGui::TextUnformatted(str_repr.c_str());
+                                    if (hovered_bytes.first &&
+                                        index_offset <= hovered_bytes.second.first &&
+                                        index_offset > hovered_bytes.second.second)
+                                    {
+                                        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+                                        ImVec2 p_min = ImGui::GetItemRectMin();
+                                        ImVec2 p_max = ImGui::GetItemRectMax();
+                                        draw_list->ChannelsSplit(2);
+                                        draw_list->ChannelsSetCurrent(0);
+                                        draw_list->AddRectFilled(p_min, p_max, highlight_color);
+                                        draw_list->ChannelsMerge();
+                                    }
+                                    if (i < 7)
+                                    {
+                                        ImGui::SameLine();
+                                    }
+                                }
+                            }
+                            ImGui::PopStyleVar();
+                        }
+                        else
+                        {
+                            const size_t index = row * 8 + column - 1;
                             const size_t index_offset = selected_bytes.size() - index;
                             if (index < selected_bytes.size())
                             {
-                                str_repr[0] = std::isprint(selected_bytes[index]) ? static_cast<char>(selected_bytes[index]) : '.';
-                                ImGui::TextUnformatted(str_repr.c_str());
-                                if (hovered_bytes.first &&
-                                    index_offset <= hovered_bytes.second.first &&
-                                    index_offset > hovered_bytes.second.second)
+                                ImGui::Text("%02X", static_cast<int>(selected_bytes[index]));
+                                if (ImGui::IsItemHovered())
                                 {
-                                    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-                                    ImVec2 p_min = ImGui::GetItemRectMin();
-                                    ImVec2 p_max = ImGui::GetItemRectMax();
-                                    draw_list->ChannelsSplit(2);
-                                    draw_list->ChannelsSetCurrent(0);
-                                    draw_list->AddRectFilled(p_min, p_max, highlight_color);
-                                    draw_list->ChannelsMerge();
-                                }
-                                if (i < 7)
-                                {
-                                    ImGui::SameLine();
+                                    const std::string tooltip = GetJsonPath(selected_json, index_offset);
+                                    if (!tooltip.empty())
+                                    {
+                                        ImGui::SetTooltip(tooltip.c_str());
+                                    }
                                 }
                             }
-                        }
-                        ImGui::PopStyleVar();
-                    }
-                    else
-                    {
-                        const size_t index = row * 8 + column - 1;
-                        const size_t index_offset = selected_bytes.size() - index;
-                        if (index < selected_bytes.size())
-                        {
-                            ImGui::Text("%02X", static_cast<int>(selected_bytes[index]));
-                            if (ImGui::IsItemHovered())
+                            if (hovered_bytes.first &&
+                                index_offset <= hovered_bytes.second.first &&
+                                index_offset > hovered_bytes.second.second)
                             {
-                                const std::string tooltip = GetJsonPath(selected_json, index_offset);
-                                if (!tooltip.empty())
-                                {
-                                    ImGui::SetTooltip(tooltip.c_str());
-                                }
+                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, highlight_color);
                             }
-                        }
-                        if (hovered_bytes.first &&
-                            index_offset <= hovered_bytes.second.first &&
-                            index_offset > hovered_bytes.second.second)
-                        {
-                            ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, highlight_color);
                         }
                     }
                 }
             }
-        }
-        clipper.End();
-        ImGui::EndTable();
-        // If hovered with parsed detailed data, scroll to the corresponding row
-        if (hovered_bytes.first && hovered_bytes.second.first != 0)
-        {
-            ImGui::SetScrollY(clipper.ItemsHeight * std::floor(static_cast<float>(selected_bytes.size() - hovered_bytes.second.first) / 8.0f));
+            clipper.End();
+            ImGui::EndTable();
+            // If hovered with parsed detailed data, scroll to the corresponding row
+            if (hovered_bytes.first && hovered_bytes.second.first != 0)
+            {
+                ImGui::SetScrollY(clipper.ItemsHeight * std::floor(static_cast<float>(selected_bytes.size() - hovered_bytes.second.first) / 8.0f));
+            }
         }
     }
     ImGui::EndChild();
@@ -455,9 +473,9 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
             packets_history.empty() ?
                 1.0f :
                 static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(packets_history.back().date - start_time).count()) / 1000.0f;
-        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Server --> Client", running_s, bandwidth_per_s_clientbound, count_per_s_clientbound);
+        RenderNetworkData(clientbound_network_recap_data, clientbound_total_network_recap, 0.5f * (available_space.x - ImGui::GetStyle().ItemSpacing.x), "Server --> Client", running_s, bandwidth_per_s_clientbound, count_per_s_clientbound);
         ImGui::SameLine();
-        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, 0.5f * (available_width - ImGui::GetStyle().ItemSpacing.x), "Client --> Server", running_s, bandwidth_per_s_serverbound, count_per_s_serverbound);
+        RenderNetworkData(serverbound_network_recap_data, serverbound_total_network_recap, 0.5f * (available_space.x - ImGui::GetStyle().ItemSpacing.x), "Client --> Server", running_s, bandwidth_per_s_serverbound, count_per_s_serverbound);
     }
 
     ImGui::PopID();
