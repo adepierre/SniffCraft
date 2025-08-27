@@ -15,6 +15,7 @@
 
 #ifdef WITH_GUI
 #include <imgui.h>
+#include <misc/cpp/imgui_stdlib.h>
 #endif
 
 using namespace ProtocolCraft;
@@ -208,98 +209,133 @@ std::string GetJsonPath(const Json::Value& json, const size_t byte_offset);
 
 void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, const NetworkRecapItem& total, const float width, const std::string& table_title, const float running_time_s, bool& display_bandwidth_per_s, bool& display_count_per_s);
 
+char ToLowerCase(const char c);
+
+std::string ToLowerCase(const std::string& s);
+
+bool PacketNameMatch(const std::string_view& packet_name, const std::string& search_str_lowcase);
+
 std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
 {
+    ImGuiStyle& style = ImGui::GetStyle();
     std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> return_value = { nullptr, ConnectionState::None, Endpoint::Client };
     ImGui::PushID(base_filename.c_str());
-
     const float available_width = ImGui::GetContentRegionAvail().x;
-    if (ImGui::BeginChild("##packet_names", ImVec2(0.4f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar))
+    if (ImGui::BeginChild("##packet_names_group", ImVec2(0.4f * (available_width - 2.0 * ImGui::GetStyle().ItemSpacing.x), 20 * ImGui::GetTextLineHeightWithSpacing()), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground))
     {
-        std::scoped_lock lock(packets_history_mutex);
-        ImGuiListClipper clipper;
-        clipper.Begin(static_cast<int>(packets_history_filtered_indices.size()), ImGui::GetTextLineHeightWithSpacing());
-        while (clipper.Step())
+        ImGui::SetNextItemWidth(
+            ImGui::GetContentRegionAvail().x
+            - style.ItemSpacing.x
+            - ImGui::GetFrameHeight()
+            - style.FramePadding.x
+            - style.ItemInnerSpacing.x
+            - ImGui::CalcTextSize("Include ignored in search").x);
+        bool search_changed = false;
         {
-            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+            std::scoped_lock<std::mutex> search_lock(search_mutex);
+            if (ImGui::InputTextWithHint("##search_packets", "Search packet name...", &search_str))
             {
-                ImGui::PushID(i);
-                const LogItem& item = packets_history[packets_history_filtered_indices[i]];
-
-                ImGui::SetNextItemAllowOverlap();
-                if (ImGui::Selectable(("##" + std::to_string(i)).c_str(), selected_index == packets_history_filtered_indices[i], ImGuiSelectableFlags_None, ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
-                {
-                    // Select if not selected, deselect if already selected
-                    selected_index = packets_history_filtered_indices[i] == selected_index ? -1 : packets_history_filtered_indices[i];
-                    if (selected_index != -1)
-                    {
-                        // We need to dump the message to get the bytes
-                        // As fields with non-guaranteed order (e.g. maps)
-                        // might have changed, we need to reparse the bytes
-                        // (otherwise some offset in the json could match a
-                        // different dumped byte)
-                        selected_bytes.clear();
-                        item.packet->Write(selected_bytes);
-                        size_t remaining_bytes = selected_bytes.size();
-                        ReadIterator iter = selected_bytes.cbegin();
-                        // Skip message ID
-                        ReadData<VarInt>(iter, remaining_bytes);
-                        std::shared_ptr<Packet> cloned = item.packet->CopyTypeOnly();
-                        cloned->Read(iter, remaining_bytes);
-                        selected_json = cloned->Serialize();
-                    }
-                }
-                if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
-                {
-                    ImGui::Text("ID: %i", item.packet->GetId());
-                    ImGui::EndTooltip();
-                }
-                ImGui::SameLine();
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));;
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));;
-                if (ImGui::Button("X", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
-                {
-                    return_value = { item.packet, item.connection_state, SimpleOrigin(item.origin) };
-                    if (selected_index == packets_history_filtered_indices[i])
-                    {
-                        selected_index = -1;
-                    }
-                }
-                ImGui::PopStyleVar();
-                ImGui::PopStyleVar();
-                if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
-                {
-                    ImGui::TextUnformatted("Add to ignore list");
-                    ImGui::EndTooltip();
-                }
-                ImGui::SameLine();
-                const std::chrono::system_clock::duration diff = item.date - start_time;
-                auto hours = std::chrono::duration_cast<std::chrono::hours>(diff).count();
-                auto min = std::chrono::duration_cast<std::chrono::minutes>(diff).count();
-                auto sec = std::chrono::duration_cast<std::chrono::seconds>(diff).count();
-                auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-
-                millisec -= sec * 1000;
-                sec -= min * 60;
-                min -= hours * 60;
-
-                ImGui::Text("[%ld:%02ld:%02ld:%03ld]", hours, min, sec, millisec);
-                ImGui::SameLine();
-                ImGui::Text("[%ld]", packets_history_filtered_indices[i]);
-                ImGui::SameLine();
-                ImGui::TextUnformatted(ConnectionStateToString(item.connection_state).data());
-                ImGui::SameLine();
-                ImGui::TextUnformatted(OriginToString(item.origin).data());
-                ImGui::SameLine();
-                ImGui::TextUnformatted(GetPacketName(item).c_str());
-                ImGui::PopID();
+                search_changed = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("Include ignored in search", &search_ignored_packets))
+            {
+                search_changed = true;
             }
         }
-        clipper.End();
-        if (selected_index == -1)
+        if (search_changed)
         {
-            ImGui::SetScrollHereY();
+            UpdateFilteredPackets();
         }
+
+        if (ImGui::BeginChild("##packet_names", ImVec2(0,0), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_HorizontalScrollbar))
+        {
+            std::scoped_lock lock(packets_history_mutex);
+            ImGuiListClipper clipper;
+            clipper.Begin(static_cast<int>(packets_history_filtered_indices.size()), ImGui::GetTextLineHeightWithSpacing());
+            while (clipper.Step())
+            {
+                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+                {
+                    ImGui::PushID(i);
+                    const LogItem& item = packets_history[packets_history_filtered_indices[i]];
+
+                    ImGui::SetNextItemAllowOverlap();
+                    if (ImGui::Selectable(("##" + std::to_string(i)).c_str(), selected_index == packets_history_filtered_indices[i], ImGuiSelectableFlags_None, ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
+                    {
+                        // Select if not selected, deselect if already selected
+                        selected_index = packets_history_filtered_indices[i] == selected_index ? -1 : packets_history_filtered_indices[i];
+                        if (selected_index != -1)
+                        {
+                            // We need to dump the message to get the bytes
+                            // As fields with non-guaranteed order (e.g. maps)
+                            // might have changed, we need to reparse the bytes
+                            // (otherwise some offset in the json could match a
+                            // different dumped byte)
+                            selected_bytes.clear();
+                            item.packet->Write(selected_bytes);
+                            size_t remaining_bytes = selected_bytes.size();
+                            ReadIterator iter = selected_bytes.cbegin();
+                            // Skip message ID
+                            ReadData<VarInt>(iter, remaining_bytes);
+                            std::shared_ptr<Packet> cloned = item.packet->CopyTypeOnly();
+                            cloned->Read(iter, remaining_bytes);
+                            selected_json = cloned->Serialize();
+                        }
+                    }
+                    if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
+                    {
+                        ImGui::Text("ID: %i", item.packet->GetId());
+                        ImGui::EndTooltip();
+                    }
+                    ImGui::SameLine();
+                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));;
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));;
+                    if (ImGui::Button("X", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing())))
+                    {
+                        return_value = { item.packet, item.connection_state, SimpleOrigin(item.origin) };
+                        if (selected_index == packets_history_filtered_indices[i])
+                        {
+                            selected_index = -1;
+                        }
+                    }
+                    ImGui::PopStyleVar();
+                    ImGui::PopStyleVar();
+                    if (ImGui::IsItemHovered() && ImGui::BeginTooltip())
+                    {
+                        ImGui::TextUnformatted("Add to ignore list");
+                        ImGui::EndTooltip();
+                    }
+                    ImGui::SameLine();
+                    const std::chrono::system_clock::duration diff = item.date - start_time;
+                    auto hours = std::chrono::duration_cast<std::chrono::hours>(diff).count();
+                    auto min = std::chrono::duration_cast<std::chrono::minutes>(diff).count();
+                    auto sec = std::chrono::duration_cast<std::chrono::seconds>(diff).count();
+                    auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
+
+                    millisec -= sec * 1000;
+                    sec -= min * 60;
+                    min -= hours * 60;
+
+                    ImGui::Text("[%ld:%02ld:%02ld:%03ld]", hours, min, sec, millisec);
+                    ImGui::SameLine();
+                    ImGui::Text("[%ld]", packets_history_filtered_indices[i]);
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(ConnectionStateToString(item.connection_state).data());
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(OriginToString(item.origin).data());
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(GetPacketName(item).c_str());
+                    ImGui::PopID();
+                }
+            }
+            clipper.End();
+            if (selected_index == -1)
+            {
+                ImGui::SetScrollHereY();
+            }
+        }
+        ImGui::EndChild();
     }
     ImGui::EndChild();
 
@@ -427,6 +463,44 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
     ImGui::PopID();
     return return_value;
 }
+
+void Logger::UpdateFilteredPackets()
+{
+    std::scoped_lock locks(packets_history_mutex, search_mutex, ignored_packets_mutex);
+    packets_history_filtered_indices.clear();
+    // No search string, just hide all ignored packets
+    if (search_str.empty())
+    {
+        for (size_t i = 0; i < packets_history.size(); ++i)
+        {
+            const std::set<int>& ignored_set = ignored_packets[{packets_history[i].connection_state, SimpleOrigin(packets_history[i].origin)}];
+            const bool is_ignored = ignored_set.find(packets_history[i].packet->GetId()) != ignored_set.end();
+            if (!is_ignored)
+            {
+                packets_history_filtered_indices.push_back(i);
+            }
+        }
+    }
+    // Else check for each packet if it matches with the search query
+    else
+    {
+        const std::string lower_case_search = ToLowerCase(search_str);
+        for (size_t i = 0; i < packets_history.size(); ++i)
+        {
+            const LogItem& item = packets_history[i];
+            const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
+            const bool is_ignored = ignored_set.find(item.packet->GetId()) != ignored_set.end();
+            if (is_ignored && !search_ignored_packets)
+            {
+                continue;
+            }
+            if (PacketNameMatch(item.packet->GetName(), lower_case_search))
+            {
+                packets_history_filtered_indices.push_back(i);
+            }
+        }
+    }
+}
 #endif
 
 void Logger::LogConsume()
@@ -534,6 +608,22 @@ void Logger::LogConsume()
                 std::scoped_lock lock(ignored_packets_mutex);
                 const std::set<int>& ignored_set = ignored_packets[{item.connection_state, SimpleOrigin(item.origin)}];
                 const bool is_ignored = ignored_set.find(item.packet->GetId()) != ignored_set.end();
+#ifdef WITH_GUI
+                // If this packet is ignored but we have an active filter on ignored packet, add it to display
+                if (in_gui)
+                {
+                    std::scoped_lock<std::mutex> search_lock(search_mutex);
+                    if (is_ignored &&
+                        search_ignored_packets &&
+                        !search_str.empty() &&
+                        PacketNameMatch(item.packet->GetName(), ToLowerCase(search_str))
+                    )
+                    {
+                        std::scoped_lock<std::mutex> history_lock(packets_history_mutex);
+                        packets_history_filtered_indices.push_back(packets_history.size() - 1);
+                    }
+                }
+#endif
                 if (is_ignored)
                 {
                     continue;
@@ -543,8 +633,11 @@ void Logger::LogConsume()
 #ifdef WITH_GUI
             if (in_gui)
             {
-                std::scoped_lock<std::mutex> archive_lock(packets_history_mutex);
-                packets_history_filtered_indices.push_back(packets_history.size() - 1);
+                std::scoped_lock<std::mutex, std::mutex> history_lock(packets_history_mutex, search_mutex);
+                if (search_str.empty() || PacketNameMatch(item.packet->GetName(), ToLowerCase(search_str)))
+                {
+                    packets_history_filtered_indices.push_back(packets_history.size() - 1);
+                }
             }
 #endif
 
@@ -676,17 +769,7 @@ void Logger::LoadConfig()
     // Rewrite filtered packet history with updated ignored lists
     if (in_gui)
     {
-        std::scoped_lock archive_lock(packets_history_mutex, ignored_packets_mutex);
-        packets_history_filtered_indices.clear();
-        for (size_t i = 0; i < packets_history.size(); ++i)
-        {
-            const std::set<int>& ignored_set = ignored_packets[{packets_history[i].connection_state, SimpleOrigin(packets_history[i].origin)}];
-            const bool is_ignored = ignored_set.find(packets_history[i].packet->GetId()) != ignored_set.end();
-            if (!is_ignored)
-            {
-                packets_history_filtered_indices.push_back(i);
-            }
-        }
+        UpdateFilteredPackets();
     }
 #endif
     std::cout << "Conf file loaded from " << Conf::conf_path << std::endl;
@@ -1816,5 +1899,30 @@ void RenderNetworkData(const std::map<std::string, NetworkRecapItem>& data, cons
 
         ImGui::EndTable();
     }
+}
+
+char ToLowerCase(const char c)
+{
+    return (c >= 'A' && c < 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+std::string ToLowerCase(const std::string& s)
+{
+    std::string output;
+    output.reserve(s.size());
+    for (const char c : s)
+    {
+        output.push_back(ToLowerCase(c));
+    }
+    return output;
+}
+
+bool PacketNameMatch(const std::string_view& packet_name, const std::string& search_str_lowcase)
+{
+    return std::search(
+        packet_name.begin(), packet_name.end(),
+        search_str_lowcase.begin(), search_str_lowcase.end(),
+        [](const char c1, const char c2) { return ToLowerCase(c1) == c2; }
+    ) != packet_name.end();
 }
 #endif

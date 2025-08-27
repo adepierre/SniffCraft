@@ -37,6 +37,8 @@ public:
     /// @brief Render this Logger packets
     /// @return A tuple <message, connection state, origin> to add to ignored, if first element is nullptr, nothing to add
     std::tuple<std::shared_ptr<ProtocolCraft::Packet>, ProtocolCraft::ConnectionState, Endpoint> Render();
+    /// @brief Will recreate packets_history_filtered_indices based on currently ignored packets and search string
+    void UpdateFilteredPackets();
 #endif
 
 private:
@@ -97,5 +99,8 @@ private:
     bool count_per_s_serverbound = false;
     bool bandwidth_per_s_clientbound = false;
     bool bandwidth_per_s_serverbound = false;
+    std::mutex search_mutex;
+    bool search_ignored_packets = false;
+    std::string search_str;
 #endif
 };
