@@ -462,6 +462,22 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
                 ImGui::SetScrollY(clipper.ItemsHeight * std::floor(static_cast<float>(selected_bytes.size() - hovered_bytes.second.first) / 8.0f));
             }
         }
+        // Go back to the "scrolled" top left corner of the window
+        ImGui::SetCursorPosX(ImGui::GetStyle().FramePadding.x + ImGui::GetScrollX());
+        ImGui::SetCursorPosY(ImGui::GetStyle().FramePadding.y + ImGui::GetScrollY());
+        // Manually do the alpha blending with ImGuiCol_FrameBg to set alpha to 0 (otherwise we'd see the table through)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f * 0.4f + 0.16 * 0.6f, 0.59f * 0.4f + 0.29f * 0.6f, 0.98f * 0.4f + 0.48f * 0.6f, 1.0f));
+        if (ImGui::Button("Copy"))
+        {
+            std::stringstream hex_string;
+            for (size_t i = 0; i < selected_bytes.size(); ++i)
+            {
+                hex_string << "0x" << std::setw(2) << std::setfill('0') << std::uppercase << std::hex << static_cast<int>(selected_bytes[i]) << (i == selected_bytes.size() - 1 ? "" : " ");
+            }
+
+            ImGui::SetClipboardText(hex_string.str().c_str());
+        }
+        ImGui::PopStyleColor();
     }
     ImGui::EndChild();
 
@@ -682,7 +698,7 @@ void Logger::LogConsume()
                 item.packet->Write(bytes);
                 for (size_t i = 0; i < bytes.size(); ++i)
                 {
-                    output << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(bytes[i]) << (i == bytes.size() - 1 ? "" : " ");
+                    output << "0x" << std::setw(2) << std::setfill('0') << std::uppercase << std::hex << static_cast<int>(bytes[i]) << (i == bytes.size() - 1 ? "" : " ");
                 }
             }
             if (is_detailed)
