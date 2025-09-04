@@ -265,7 +265,8 @@ void Server::Render()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+    // Enable window resizing
+    glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
     GLFWwindow* window = glfwCreateWindow(1200, 960, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
@@ -273,6 +274,9 @@ void Server::Render()
         glfwTerminate();
         return;
     }
+
+    // Set minimum window size to ensure usability
+    glfwSetWindowSizeLimits(window, 800, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
 
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
@@ -294,6 +298,12 @@ void Server::Render()
                 }
             }
         });
+
+    // Add resize callback to handle viewport updates
+    glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height)
+    {
+        glViewport(0, 0, width, height);
+    });
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -615,6 +625,9 @@ void Server::InternalRenderLoop(GLFWwindow* window)
 
     while (glfwWindowShouldClose(window) == 0)
     {
+        // Update window size each frame to handle resizing
+        glfwGetWindowSize(window, &width, &height);
+
         // clear the window
         glClear(GL_COLOR_BUFFER_BIT);
 
