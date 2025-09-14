@@ -333,7 +333,11 @@ void MinecraftProxy::Handle(ClientboundLoginCompressionPacket& packet)
 void MinecraftProxy::Handle(ClientboundHelloPacket& packet)
 {
 #ifdef USE_ENCRYPTION
-    if (authentifier == nullptr)
+    if (authentifier == nullptr
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+        && packet.GetShouldAuthenticate()
+#endif
+    )
     {
         std::cerr << "WARNING, trying to connect to a server with encryption enabled\n"
             << "but impossible without being authenticated.\n"
@@ -366,7 +370,13 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& packet)
         raw_shared_secret, encrypted_shared_secret, encrypted_challenge);
 #endif
 
-    authentifier->JoinServer(packet.GetServerId(), raw_shared_secret, packet.GetPublicKey());
+    // In 1.20.5+, encryption can be enabled even in offline mode
+#if PROTOCOL_VERSION > 765 /* > 1.20.4 */
+    if (packet.GetShouldAuthenticate())
+#endif
+    {
+        authentifier->JoinServer(packet.GetServerId(), raw_shared_secret, packet.GetPublicKey());
+    }
 
     std::shared_ptr<ServerboundKeyPacket> response_packet = std::make_shared<ServerboundKeyPacket>();
     response_packet->SetKeyBytes(encrypted_shared_secret);
