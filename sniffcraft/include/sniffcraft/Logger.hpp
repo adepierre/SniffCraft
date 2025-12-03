@@ -102,5 +102,6 @@ private:
     std::mutex search_mutex;
     bool search_ignored_packets = false;
     std::string search_str;
+    bool autoscroll = true;
 #endif
 };

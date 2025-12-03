@@ -274,6 +274,7 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
                         selected_index = packets_history_filtered_indices[i] == selected_index ? -1 : packets_history_filtered_indices[i];
                         if (selected_index != -1)
                         {
+                            autoscroll = false;
                             // We need to dump the message to get the bytes
                             // As fields with non-guaranteed order (e.g. maps)
                             // might have changed, we need to reparse the bytes
@@ -337,12 +338,28 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
                 }
             }
             clipper.End();
-            if (selected_index == -1)
+            if (autoscroll)
             {
                 ImGui::SetScrollHereY();
             }
+            else
+            {
+                ImGui::SetCursorPosX((ImGui::GetWindowWidth() - ImGui::CalcTextSize("Enable autoscroll").x - ImGui::GetStyle().FramePadding.x * 3 - ImGui::GetStyle().ScrollbarSize + ImGui::GetScrollX()) / 2.0f);
+                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFrameHeight() - ImGui::GetStyle().FramePadding.y - ImGui::GetStyle().ScrollbarSize + ImGui::GetScrollY());
+                // Manually do the alpha blending with ImGuiCol_FrameBg to set alpha to 0 (otherwise we'd see the stuff below through)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f * 0.4f + 0.16 * 0.6f, 0.59f * 0.4f + 0.29f * 0.6f, 0.98f * 0.4f + 0.48f * 0.6f, 1.0f));
+                if (ImGui::Button("Enable autoscroll"))
+                {
+                    autoscroll = true;
+                }
+                ImGui::PopStyleColor();
+            }
         }
         ImGui::EndChild();
+        if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel > 0)
+        {
+            autoscroll = false;
+        }
     }
     ImGui::EndChild();
 
