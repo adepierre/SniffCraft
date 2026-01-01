@@ -87,8 +87,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Upload artifact
+        if: ${{ inputs.os != 'macos-latest' }}
         uses: actions/upload-artifact@v4
         with:
           name: sniffcraft-${{ runner.os }}
           path: ${{ github.workspace }}/bin/sniffcraft*
+          retention-days: 1
+
+      - name: Archive macOS application
+        if: ${{ inputs.os == 'macos-latest' }}
+        run: cd ${{ github.workspace }}/bin && zip -r sniffcraft.zip SniffCraft.app
+
+      - name: Upload macOS artifact
+        if: ${{ inputs.os == 'macos-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sniffcraft-${{ runner.os }}
+          path: ${{ github.workspace }}/bin/sniffcraft.zip
           retention-days: 1
