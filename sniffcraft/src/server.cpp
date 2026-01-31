@@ -885,6 +885,20 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                     }
                     ImGui::EndCombo();
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Hide all"))
+                {
+                    hidden.insert(hidden.end(), displayed.begin(), displayed.end());
+                    displayed.clear();
+                    on_ignored_changed();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Show all"))
+                {
+                    displayed.insert(displayed.end(), hidden.begin(), hidden.end());
+                    hidden.clear();
+                    on_ignored_changed();
+                }
 
                 const float half_size = 0.5f * (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
                 ImGui::TextUnformatted("Displayed packets (double click to ignore)");
