@@ -1,7 +1,7 @@
 FetchContent_Declare(
   imgui
   GIT_REPOSITORY https://github.com/ocornut/imgui
-  GIT_TAG v1.90.4
+  GIT_TAG v1.92.5
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
 )

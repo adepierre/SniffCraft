@@ -265,8 +265,10 @@ void Server::Render()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
+    const float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
+
     glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
-    GLFWwindow* window = glfwCreateWindow(1200, 960, "SniffCraft", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1200 * main_scale, 960 * main_scale, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
         std::cerr << "Failed to create GLFW window, you can launch SniffCraft without GUI with the --headless argument" << std::endl;
@@ -312,6 +314,9 @@ void Server::Render()
     ImGui::StyleColorsDark();
     ImGui::GetIO().IniFilename = NULL;
     ImGui::GetIO().LogFilename = NULL;
+
+    ImGui::GetStyle().ScaleAllSizes(main_scale);
+    ImGui::GetStyle().FontScaleDpi = main_scale;
 
     // Setup platform/renderer
     ImGui_ImplGlfw_InitForOpenGL(window, true);
