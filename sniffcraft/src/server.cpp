@@ -338,6 +338,8 @@ void Server::InternalRenderLoop(GLFWwindow* window)
     std::string local_port_str = std::to_string(client_port);
     bool is_online = false;
     std::string cache_key = "";
+    std::string active_conf = "";
+    std::set<std::string> conf_list = Conf::GetConfList();
     bool log_to_console = false;
     bool network_recap_to_console = false;
     bool log_to_text_file = false;
@@ -364,10 +366,21 @@ void Server::InternalRenderLoop(GLFWwindow* window)
     std::vector<NameID> displayed;
     std::vector<NameID> hidden;
 
-    const auto on_display_changed = [&]()
+    const auto on_conf_changed = [&]()
     {
         std::shared_lock<std::shared_mutex> lock(Conf::conf_mutex);
         const ProtocolCraft::Json::Value conf = Conf::LoadConf();
+
+        active_conf = Conf::active_conf.value();
+        is_online = conf.contains(Conf::online_key) && conf[Conf::online_key].is_bool() && conf[Conf::online_key].get<bool>();
+        cache_key = (conf.contains(Conf::account_cache_key_key) && conf[Conf::account_cache_key_key].is_string()) ? conf[Conf::account_cache_key_key].get_string() : "";
+        log_to_console = conf.contains(Conf::console_log_key) && conf[Conf::console_log_key].is_bool() && conf[Conf::console_log_key].get<bool>();
+        network_recap_to_console = conf.contains(Conf::network_recap_to_console_key) && conf[Conf::network_recap_to_console_key].is_bool() && conf[Conf::network_recap_to_console_key].get<bool>();
+        log_to_text_file = conf.contains(Conf::text_file_log_key) && conf[Conf::text_file_log_key].is_bool() && conf[Conf::text_file_log_key].get<bool>();
+        log_to_bin_file = conf.contains(Conf::binary_file_log_key) && conf[Conf::binary_file_log_key].is_bool() && conf[Conf::binary_file_log_key].get<bool>();
+        log_raw_bytes = conf.contains(Conf::raw_bytes_log_key) && conf[Conf::raw_bytes_log_key].is_bool() && conf[Conf::raw_bytes_log_key].get<bool>();
+        log_to_replay_file = conf.contains(Conf::replay_log_key) && conf[Conf::replay_log_key].is_bool() && conf[Conf::replay_log_key].get<bool>();
+
         const ConnectionState state = static_cast<ConnectionState>(selected_connection_state);
         displayed.clear();
         hidden.clear();
@@ -542,6 +555,15 @@ void Server::InternalRenderLoop(GLFWwindow* window)
 
         std::sort(displayed.begin(), displayed.end(), [](const NameID& a, const NameID& b) { return a.name < b.name; });
         std::sort(hidden.begin(), hidden.end(), [](const NameID& a, const NameID& b) { return a.name < b.name; });
+
+        {
+            // Triger a load config for all associated loggers
+            std::scoped_lock<std::mutex> lock(loggers_mutex);
+            for (auto& l : loggers)
+            {
+                l->LoadConfig();
+            }
+        }
     };
     const auto on_ignored_changed = [&]()
     {
@@ -594,21 +616,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
         }
     };
 
-    // Init the values with actual conf values
-    {
-        std::shared_lock<std::shared_mutex> lock(Conf::conf_mutex);
-        const ProtocolCraft::Json::Value conf = Conf::LoadConf();
-        is_online = conf.contains(Conf::online_key) && conf[Conf::online_key].is_bool() && conf[Conf::online_key].get<bool>();
-        cache_key = (conf.contains(Conf::account_cache_key_key) && conf[Conf::account_cache_key_key].is_string()) ? conf[Conf::account_cache_key_key].get_string() : "";
-        log_to_console = conf.contains(Conf::console_log_key) && conf[Conf::console_log_key].is_bool() && conf[Conf::console_log_key].get<bool>();
-        network_recap_to_console = conf.contains(Conf::network_recap_to_console_key) && conf[Conf::network_recap_to_console_key].is_bool() && conf[Conf::network_recap_to_console_key].get<bool>();
-        log_to_text_file = conf.contains(Conf::text_file_log_key) && conf[Conf::text_file_log_key].is_bool() && conf[Conf::text_file_log_key].get<bool>();
-        log_to_bin_file = conf.contains(Conf::binary_file_log_key) && conf[Conf::binary_file_log_key].is_bool() && conf[Conf::binary_file_log_key].get<bool>();
-        log_raw_bytes = conf.contains(Conf::raw_bytes_log_key) && conf[Conf::raw_bytes_log_key].is_bool() && conf[Conf::raw_bytes_log_key].get<bool>();
-        log_to_replay_file = conf.contains(Conf::replay_log_key) && conf[Conf::replay_log_key].is_bool() && conf[Conf::replay_log_key].get<bool>();
-    }
-    on_display_changed();
-
+    on_conf_changed();
 
     while (glfwWindowShouldClose(window) == 0)
     {
@@ -634,6 +642,62 @@ void Server::InternalRenderLoop(GLFWwindow* window)
             );
             ImGui::SeparatorText("Application parameters");
             {
+                bool conf_changed = false;
+                {
+                    std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);
+                    ImGui::TextUnformatted("Conf name");
+                    ImGui::SameLine();
+                    HelpMarker("Change the name to save the current configuration under a new name");
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(0.7f * ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##conf_name", &active_conf);
+                    if (ImGui::IsItemDeactivatedAfterEdit())
+                    {
+                        const ProtocolCraft::Json::Value conf = Conf::LoadConf();
+                        Conf::active_conf = active_conf;
+                        conf_list.insert(active_conf);
+                        Conf::SaveConf(conf);
+                        ResolveIpPortFromAddress();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::BeginCombo("##conf_list", active_conf.c_str(), ImGuiComboFlags_WidthFitPreview))
+                    {
+                        bool deleted = false;
+                        for (const auto& s : conf_list)
+                        {
+                            ImGui::BeginDisabled(s == active_conf);
+                            ImGui::PushID(s.c_str());
+                            if (ImGui::Button("X"))
+                            {
+                                Conf::DeleteConf(s);
+                                deleted = true;
+                            }
+                            ImGui::PopID();
+                            if (ImGui::IsItemHovered())
+                            {
+                                ImGui::SetTooltip("%s", "Delete this configuration");
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Selectable(s.c_str()))
+                            {
+                                Conf::active_conf = s;
+                                const ProtocolCraft::Json::Value conf = Conf::LoadConf();
+                                Conf::SaveConf(conf);
+                                conf_changed = true;
+                            }
+                            ImGui::EndDisabled();
+                        }
+                        if (deleted)
+                        {
+                            conf_list = Conf::GetConfList();
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+                if (conf_changed)
+                {
+                    on_conf_changed();
+                }
                 ImGui::TextUnformatted("Server address");
                 ImGui::SameLine();
                 HelpMarker("Server address, as you would enter it in a minecraft client");
@@ -837,7 +901,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 }
                 else
                 {
-                    ImGui::Text("Any connection on 127.0.0.1:%i will be redirected to %s:%i", client_port, server_ip.c_str(), server_port);
+                    ImGui::Text("Connect your client to 127.0.0.1:%i and it will be redirected to %s:%i", client_port, server_ip.c_str(), server_port);
                 }
             }
 
@@ -854,7 +918,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                             selected_connection_state = static_cast<int>(n);
                             if (!is_selected)
                             {
-                                on_display_changed();
+                                on_conf_changed();
                             }
                         }
                         if (is_selected)
@@ -875,7 +939,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                             selected_direction = static_cast<int>(n);
                             if (!is_selected)
                             {
-                                on_display_changed();
+                                on_conf_changed();
                             }
                         }
                         if (is_selected)
@@ -1001,7 +1065,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 // Switch display to the one matching the message
                 selected_connection_state = static_cast<int>(connection_state);
                 selected_direction = static_cast<int>(origin);
-                on_display_changed();
+                on_conf_changed();
                 // Add this message to hidden
                 hidden.push_back(NameID{ message->GetName(), message->GetId() });
                 for (int i = static_cast<int>(displayed.size()) - 1; i > -1; --i)
@@ -1015,7 +1079,7 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 // Switch back to the previously selected display
                 selected_connection_state = current_selected_connection_state;
                 selected_direction = current_selected_direction;
-                on_display_changed();
+                on_conf_changed();
             }
             ImGui::End();
         }

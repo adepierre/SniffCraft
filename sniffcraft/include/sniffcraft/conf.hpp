@@ -3,12 +3,15 @@
 #include <protocolCraft/Utilities/Json.hpp>
 
 #include <ctime>
+#include <optional>
+#include <set>
 #include <shared_mutex>
 #include <string>
 
 class Conf
 {
 public:
+    static const std::string active_conf_key;
     static const std::string server_address_key;
     static const std::string local_port_key;
     static const std::string text_file_log_key;
@@ -31,10 +34,16 @@ public:
 
     static bool headless;
     static std::string conf_path;
+    static std::optional<std::string> active_conf;
     static std::shared_mutex conf_mutex;
 
 public:
     static ProtocolCraft::Json::Value LoadConf();
     static void SaveConf(const ProtocolCraft::Json::Value& conf);
     static std::time_t GetModifiedTimestamp();
+    static std::set<std::string> GetConfList();
+    static void DeleteConf(const std::string& name);
+
+private:
+    static ProtocolCraft::Json::Value LoadConfFile();
 };

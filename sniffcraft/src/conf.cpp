@@ -11,6 +11,7 @@
 #define stat _stat
 #endif
 
+const std::string Conf::active_conf_key = "ActiveConf";
 const std::string Conf::server_address_key = "ServerAddress";
 const std::string Conf::local_port_key = "LocalPort";
 const std::string Conf::text_file_log_key = "LogToTxtFile";
@@ -39,33 +40,16 @@ bool Conf::headless = true;
 
 std::string Conf::conf_path = "";
 
+std::optional<std::string> Conf::active_conf = std::nullopt;
+
 std::shared_mutex Conf::conf_mutex;
 
 ProtocolCraft::Json::Value Conf::LoadConf()
 {
-    if (conf_path.empty())
-    {
-        conf_path = "conf.json";
-    }
+    const ProtocolCraft::Json::Value main_json = LoadConfFile();
 
-    // Create file if it doesn't exist
-    if (!std::filesystem::exists(conf_path))
-    {
-        std::ofstream outfile(conf_path, std::ios::out);
-        outfile << ProtocolCraft::Json::Value().Dump(4);
-    }
+    ProtocolCraft::Json::Value json = main_json[active_conf.value()];
 
-    std::ifstream file = std::ifstream(conf_path, std::ios::in);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
-    }
-    ProtocolCraft::Json::Value json;
-    file >> json;
-    file.close();
-
-    if (!json.is_object())
-        json = ProtocolCraft::Json::Object();
     // Set default values if missing
     if (!json.contains(server_address_key))
         json[server_address_key] = "127.0.0.1:25565";
@@ -109,13 +93,18 @@ ProtocolCraft::Json::Value Conf::LoadConf()
 
 void Conf::SaveConf(const ProtocolCraft::Json::Value& conf)
 {
+    ProtocolCraft::Json::Value main_json = LoadConfFile();
+
+    main_json[active_conf_key] = active_conf.value();
+    main_json[active_conf.value()] = conf;
+
     std::ofstream file = std::ofstream(conf_path, std::ios::out);
     if (!file.is_open())
     {
         throw std::runtime_error("Error trying to open conf file at: " + conf_path);
     }
 
-    file << conf.Dump(4);
+    file << main_json.Dump(4);
     file.close();
 }
 
@@ -127,4 +116,91 @@ std::time_t Conf::GetModifiedTimestamp()
         return result.st_mtime;
     }
     return -1;
+}
+
+std::set<std::string> Conf::GetConfList()
+{
+    ProtocolCraft::Json::Value json = LoadConfFile();
+
+    std::set<std::string> output;
+    for (const auto& [k, v] : json.get_object())
+    {
+        if (k != active_conf_key)
+        {
+            output.insert(k);
+        }
+    }
+    
+    return output;
+}
+
+void Conf::DeleteConf(const std::string& name)
+{
+    ProtocolCraft::Json::Value json = LoadConfFile();
+
+    json.get_object().erase(name);
+
+    std::ofstream file = std::ofstream(conf_path, std::ios::out);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
+    }
+
+    file << json.Dump(4);
+    file.close();
+}
+
+ProtocolCraft::Json::Value Conf::LoadConfFile()
+{
+    if (conf_path.empty())
+    {
+        conf_path = "conf.json";
+    }
+
+    // Create file if it doesn't exist
+    if (!std::filesystem::exists(conf_path))
+    {
+        std::ofstream outfile(conf_path, std::ios::out);
+        outfile << ProtocolCraft::Json::Value().Dump(4);
+    }
+
+    std::ifstream file = std::ifstream(conf_path, std::ios::in);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Error trying to open conf file at: " + conf_path);
+    }
+    ProtocolCraft::Json::Value json;
+    file >> json;
+    file.close();
+
+    if (!json.is_object())
+    {
+        json = ProtocolCraft::Json::Object();
+    }
+
+    // Convert old conf format
+    if (!json.contains(active_conf_key))
+    {
+        json = {
+            { active_conf_key, active_conf.value_or("default") },
+            { active_conf.value_or("default"), json }
+        };
+    }
+
+    if (!json[active_conf_key].is_string())
+    {
+        json[active_conf_key] = "default";
+    }
+
+    if (!active_conf.has_value())
+    {
+        active_conf = json[active_conf_key].get_string();
+    }
+
+    if (!json.contains(active_conf.value()))
+    {
+        json[active_conf.value()] = ProtocolCraft::Json::Value();
+    }
+
+    return json;
 }
