@@ -29,9 +29,19 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
 
     // Try to connect to remote server
     asio::ip::tcp::resolver resolver(io_context_);
-    asio::ip::tcp::resolver::results_type results = resolver.resolve(server_ip_, std::to_string(server_port_));
-
     asio::error_code ec;
+    asio::ip::tcp::resolver::results_type results = resolver.resolve(server_ip_, std::to_string(server_port_), ec);
+
+    if (ec)
+    {
+        Close();
+        std::cerr << "Error resolving address "
+            << server_address << ":" << server_port
+            << ": " << ec.message()
+            << std::endl;
+        return;
+    }
+
     asio::connect(server_connection.GetSocket(), results, ec);
 
     if (ec)
@@ -39,7 +49,7 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
         Close();
         std::cerr << "Error trying to establish connection to "
             << server_address << ":" << server_port
-            << ": " << ec
+            << ": " << ec.message()
             << std::endl;
         return;
     }
