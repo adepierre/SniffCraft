@@ -30,6 +30,7 @@ public:
 
     bool Started();
     bool Running();
+    const std::string& GetLastError() const;
 
 protected:
     /// @brief Function called when new data are available. On BaseProxy, just
@@ -89,4 +90,5 @@ private:
     std::atomic<bool> process_data_ready;
     std::atomic<bool> closed;
     std::atomic<bool> started;
+    std::string last_error_;
 };

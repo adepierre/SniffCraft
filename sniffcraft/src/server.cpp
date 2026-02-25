@@ -101,10 +101,16 @@ void Server::handle_accept(BaseProxy* new_proxy, const asio::error_code& ec)
             new_proxy->Start(server_ip, server_port);
         }
 #ifdef WITH_GUI
-        if (MinecraftProxy* casted_proxy = dynamic_cast<MinecraftProxy*>(new_proxy))
         {
             std::scoped_lock<std::mutex> lock(loggers_mutex);
-            loggers.push_back(casted_proxy->GetLogger());
+            if (!new_proxy->GetLastError().empty())
+            {
+                connection_error_ = new_proxy->GetLastError();
+            }
+            else if (MinecraftProxy* casted_proxy = dynamic_cast<MinecraftProxy*>(new_proxy))
+            {
+                loggers.push_back(casted_proxy->GetLogger());
+            }
         }
 #endif
     }
@@ -907,6 +913,13 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 else
                 {
                     ImGui::Text("Connect your client to 127.0.0.1:%i and it will be redirected to %s:%i", client_port, server_ip.c_str(), server_port);
+                    std::scoped_lock<std::mutex> lock(loggers_mutex);
+                    if (!connection_error_.empty())
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                        ImGui::TextUnformatted(connection_error_.c_str());
+                        ImGui::PopStyleColor();
+                    }
                 }
             }
 

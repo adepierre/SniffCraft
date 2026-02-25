@@ -34,11 +34,9 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
 
     if (ec)
     {
+        last_error_ = "Error resolving address " + server_address + ":" + std::to_string(server_port) + ": " + ec.message();
         Close();
-        std::cerr << "Error resolving address "
-            << server_address << ":" << server_port
-            << ": " << ec.message()
-            << std::endl;
+        std::cerr << last_error_ << std::endl;
         return;
     }
 
@@ -46,11 +44,9 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
 
     if (ec)
     {
+        last_error_ = "Error trying to establish connection to " + server_address + ":" + std::to_string(server_port) + ": " + ec.message();
         Close();
-        std::cerr << "Error trying to establish connection to "
-            << server_address << ":" << server_port
-            << ": " << ec.message()
-            << std::endl;
+        std::cerr << last_error_ << std::endl;
         return;
     }
 
@@ -95,6 +91,11 @@ void BaseProxy::Close()
 bool BaseProxy::Started()
 {
     return started;
+}
+
+const std::string& BaseProxy::GetLastError() const
+{
+    return last_error_;
 }
 
 bool BaseProxy::Running()
