@@ -27,7 +27,7 @@ public:
     );
     virtual ~MinecraftProxy();
 
-    virtual void Start(const std::string& server_address, const unsigned short server_port) override;
+    virtual std::optional<std::string> Start(const std::string& server_address, const unsigned short server_port) override;
 
     std::shared_ptr<Logger> GetLogger() const;
 

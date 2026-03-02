@@ -1,10 +1,12 @@
 #pragma once
 
-#include <list>
-#include <vector>
-#include <mutex>
-#include <memory>
 #include <atomic>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include <asio.hpp>
 
@@ -12,7 +14,7 @@
 #include "sniffcraft/enums.hpp"
 
 /// @brief A base proxy class that will transfer all data
-/// both way without changing anything. Can be overriden by 
+/// both way without changing anything. Can be overriden by
 class BaseProxy
 {
 public:
@@ -22,7 +24,8 @@ public:
     /// @brief Starts the connection process to a given server
     /// @param server_address IP address of the server
     /// @param server_port port to connect to
-    virtual void Start(const std::string& server_address, const unsigned short server_port);
+    /// @return An error message if the connection couldn't be made
+    virtual std::optional<std::string> Start(const std::string& server_address, const unsigned short server_port);
 
     /// @brief Get the client connection underlying socket
     /// @return A reference to the client socket
@@ -30,7 +33,6 @@ public:
 
     bool Started();
     bool Running();
-    const std::string& GetLastError() const;
 
 protected:
     /// @brief Function called when new data are available. On BaseProxy, just
@@ -90,5 +92,4 @@ private:
     std::atomic<bool> process_data_ready;
     std::atomic<bool> closed;
     std::atomic<bool> started;
-    std::string last_error_;
 };

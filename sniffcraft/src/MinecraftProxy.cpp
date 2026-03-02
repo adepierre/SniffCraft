@@ -45,7 +45,7 @@ MinecraftProxy::~MinecraftProxy()
     }
 }
 
-void MinecraftProxy::Start(const std::string& server_address, const unsigned short server_port)
+std::optional<std::string> MinecraftProxy::Start(const std::string& server_address, const unsigned short server_port)
 {
     logger = std::make_shared<Logger>();
 
@@ -67,13 +67,12 @@ void MinecraftProxy::Start(const std::string& server_address, const unsigned sho
         std::cout << "Trying to authenticate using Microsoft account" << std::endl;
         if (!authentifier->AuthMicrosoft(credentials_cache_key))
         {
-            std::cerr << "Error trying to authenticate with Microsoft account" << std::endl;
-            throw std::runtime_error("Error trying to authenticate with Microsoft account");
+            return "Error trying to authenticate with Microsoft account";
         }
     }
 #endif
 
-    BaseProxy::Start(server_address, server_port);
+    return BaseProxy::Start(server_address, server_port);
 }
 
 std::shared_ptr<Logger> MinecraftProxy::GetLogger() const

@@ -89,27 +89,32 @@ void Server::handle_accept(BaseProxy* new_proxy, const asio::error_code& ec)
 {
     if (!ec)
     {
+        std::optional<std::string> proxy_start_return;
         if (is_next_connection_transfer)
         {
             is_next_connection_transfer = false;
-            new_proxy->Start(transfer_ip, transfer_port);
+            proxy_start_return = new_proxy->Start(transfer_ip, transfer_port);
             transfer_ip = "";
             transfer_port = 0;
         }
         else
         {
-            new_proxy->Start(server_ip, server_port);
+            proxy_start_return = new_proxy->Start(server_ip, server_port);
+        }
+        if (proxy_start_return.has_value())
+        {
+            std::cerr << "Failed to start new proxy: " << proxy_start_return.value() << std::endl;
         }
 #ifdef WITH_GUI
         {
             std::scoped_lock<std::mutex> lock(loggers_mutex);
-            if (!new_proxy->GetLastError().empty())
+            connection_error = proxy_start_return;
+            if (!connection_error.has_value())
             {
-                connection_error_ = new_proxy->GetLastError();
-            }
-            else if (MinecraftProxy* casted_proxy = dynamic_cast<MinecraftProxy*>(new_proxy))
-            {
-                loggers.push_back(casted_proxy->GetLogger());
+                if (MinecraftProxy* casted_proxy = dynamic_cast<MinecraftProxy*>(new_proxy))
+                {
+                    loggers.push_back(casted_proxy->GetLogger());
+                }
             }
         }
 #endif
@@ -913,12 +918,14 @@ void Server::InternalRenderLoop(GLFWwindow* window)
                 else
                 {
                     ImGui::Text("Connect your client to 127.0.0.1:%i and it will be redirected to %s:%i", client_port, server_ip.c_str(), server_port);
-                    std::scoped_lock<std::mutex> lock(loggers_mutex);
-                    if (!connection_error_.empty())
                     {
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
-                        ImGui::TextUnformatted(connection_error_.c_str());
-                        ImGui::PopStyleColor();
+                        std::scoped_lock<std::mutex> lock(loggers_mutex);
+                        if (connection_error.has_value())
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                            ImGui::TextUnformatted(connection_error.value().c_str());
+                            ImGui::PopStyleColor();
+                        }
                     }
                 }
             }

@@ -21,7 +21,7 @@ BaseProxy::~BaseProxy()
     }
 }
 
-void BaseProxy::Start(const std::string& server_address, const unsigned short server_port)
+std::optional<std::string> BaseProxy::Start(const std::string& server_address, const unsigned short server_port)
 {
     std::cout << "Starting new proxy to " << server_address << ":" << server_port << std::endl;
     server_ip_ = server_address;
@@ -34,20 +34,16 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
 
     if (ec)
     {
-        last_error_ = "Error resolving address " + server_address + ":" + std::to_string(server_port) + ": " + ec.message();
         Close();
-        std::cerr << last_error_ << std::endl;
-        return;
+        return "Error resolving address " + server_address + ":" + std::to_string(server_port) + ": " + ec.message();
     }
 
     asio::connect(server_connection.GetSocket(), results, ec);
 
     if (ec)
     {
-        last_error_ = "Error trying to establish connection to " + server_address + ":" + std::to_string(server_port) + ": " + ec.message();
         Close();
-        std::cerr << last_error_ << std::endl;
-        return;
+        return "Error trying to establish connection to " + server_address + ":" + std::to_string(server_port) + ": " + ec.message();
     }
 
     closed = false;
@@ -79,6 +75,8 @@ void BaseProxy::Start(const std::string& server_address, const unsigned short se
 
     client_connection.StartListeningAndWriting();
     server_connection.StartListeningAndWriting();
+
+    return std::nullopt;
 }
 
 void BaseProxy::Close()
@@ -91,11 +89,6 @@ void BaseProxy::Close()
 bool BaseProxy::Started()
 {
     return started;
-}
-
-const std::string& BaseProxy::GetLastError() const
-{
-    return last_error_;
 }
 
 bool BaseProxy::Running()

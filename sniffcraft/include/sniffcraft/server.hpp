@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -58,6 +59,6 @@ private:
     std::thread iocontext_thread;
     std::mutex loggers_mutex;
     std::vector<std::shared_ptr<Logger>> loggers;
-    std::string connection_error_;
+    std::optional<std::string> connection_error;
 #endif
 };
