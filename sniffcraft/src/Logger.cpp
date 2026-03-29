@@ -545,7 +545,7 @@ void Logger::UpdateFilteredPackets()
             {
                 continue;
             }
-            if (PacketNameMatch(item.packet->GetName(), lower_case_search))
+            if (PacketNameMatch(GetPacketName(item), lower_case_search))
             {
                 packets_history_filtered_indices.push_back(i);
             }
