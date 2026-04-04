@@ -29,7 +29,7 @@ jobs:
     runs-on: ${{ inputs.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload version artifact
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MC-version
           path: ${{ runner.workspace }}/build/version.txt
@@ -87,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sniffcraft-${{ runner.os }}
           path: ${{ github.workspace }}/bin/sniffcraft*
