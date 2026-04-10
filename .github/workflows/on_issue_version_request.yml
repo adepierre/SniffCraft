@@ -78,12 +78,8 @@ jobs:
     needs: check_if_build_needed
     if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value != 0 }}
     steps:
-      - name: Notify issue
-        run: |
-          echo "Binaries for ${{ needs.check_if_build_needed.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." > body.txt
-          echo -en '\n' >> body.txt
-          echo You can close this issue. If you need an updated build for the same Minecraft version in the future, you can reopen this issue to trigger a new build instead of creating a new one. >> body.txt
-          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} --body-file body.txt
+      - name: Notify and close issue
+        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "Binaries for ${{ needs.check_if_build_needed.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." -r "duplicate"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -129,11 +125,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Comment on associated issue
-        run: |
-          echo "New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ needs.check_if_build_needed.outputs.version }}" > body.txt
-          echo -en '\n' >> body.txt
-          echo You can now close this issue. If you need an updated build for the same Minecraft version in the future, you can reopen this issue to trigger a new build instead of creating a new issue. >> body.txt
-          gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} --body-file body.txt
+      - name: Close associated issue
+        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ needs.check_if_build_needed.outputs.version }}" -r "completed"
         env:
           GH_TOKEN: ${{ github.token }}
