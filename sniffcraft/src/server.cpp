@@ -19,7 +19,6 @@
 #include <misc/cpp/imgui_stdlib.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
-#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 constexpr int base_window_height = 960;
@@ -311,14 +310,6 @@ void Server::Render()
                 }
             }
         });
-
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cerr << "Failed to initialize GLAD" << std::endl;
-        return;
-    }
 
     // imgui: setup context
     // ---------------------------------------

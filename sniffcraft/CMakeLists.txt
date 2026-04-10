@@ -131,6 +131,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads)
 target_link_libraries(${PROJECT_NAME} PUBLIC protocolCraft)
 
 if (SNIFFCRAFT_WITH_GUI)
-	target_link_libraries(${PROJECT_NAME} PRIVATE glfw ${OPENGL_LIBRARIES} glad imgui)
+	target_link_libraries(${PROJECT_NAME} PRIVATE glfw ${OPENGL_LIBRARIES} imgui)
     target_compile_definitions(${PROJECT_NAME} PRIVATE WITH_GUI)
 endif()
