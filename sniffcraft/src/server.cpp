@@ -21,6 +21,9 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+constexpr int base_window_height = 960;
+constexpr int base_window_width = 1200;
 #endif
 
 Server::Server()
@@ -276,16 +279,17 @@ void Server::Render()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    const float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
-
     glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
-    GLFWwindow* window = glfwCreateWindow(1200 * main_scale, 960 * main_scale, "SniffCraft", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(base_window_width, base_window_height, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
         std::cerr << "Failed to create GLFW window, you can launch SniffCraft without GUI with the --headless argument" << std::endl;
         glfwTerminate();
         return;
     }
+
+    const float main_scale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
+    glfwSetWindowSize(window, base_window_width * main_scale, base_window_height * main_scale);
 
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
@@ -362,6 +366,9 @@ void Server::InternalRenderLoop(GLFWwindow* window)
     bool log_to_bin_file = false;
     bool log_raw_bytes = false;
     bool log_to_replay_file = false;
+    float main_scale = ImGui::GetStyle()._MainScale;
+    // Used to reset all the values before rescaling
+    const ImGuiStyle style_copy = ImGui::GetStyle();
 
     // Display filter
     const std::vector<std::string> connection_state_str = {
@@ -658,6 +665,18 @@ void Server::InternalRenderLoop(GLFWwindow* window)
             );
             ImGui::SeparatorText("Application parameters");
             {
+                ImGui::TextUnformatted("App scale: ");
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(ImGui::CalcTextSize("0.000").x);
+                if (ImGui::InputFloat("##scale_input", &main_scale, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_::ImGuiInputTextFlags_CharsDecimal))
+                {
+                    main_scale = std::clamp(main_scale, 0.25f, 4.0f);
+                    ImGui::GetStyle() = style_copy;
+                    ImGui::GetStyle().ScaleAllSizes(main_scale);
+                    ImGui::GetStyle().FontScaleDpi = main_scale;
+                    glfwSetWindowSize(window, base_window_width * main_scale, base_window_height * main_scale);
+                }
+                ImGui::SameLine();
                 bool conf_changed = false;
                 {
                     std::scoped_lock<std::shared_mutex> lock(Conf::conf_mutex);
