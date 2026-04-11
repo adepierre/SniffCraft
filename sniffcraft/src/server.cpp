@@ -270,7 +270,13 @@ void Server::CleanProxies()
 #ifdef WITH_GUI
 void Server::Render()
 {
-    glfwInit();
+    if (!glfwInit())
+    {
+        const char* description;
+        int code = glfwGetError(&description);
+        std::cerr << "Failed to initialize GLFW (error " << code << ": \"" << description << "\")" << ", you can launch SniffCraft without GUI with the --headless argument" << std::endl;
+        return;
+    }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -282,7 +288,9 @@ void Server::Render()
     GLFWwindow* window = glfwCreateWindow(base_window_width, base_window_height, "SniffCraft", NULL, NULL);
     if (window == NULL)
     {
-        std::cerr << "Failed to create GLFW window, you can launch SniffCraft without GUI with the --headless argument" << std::endl;
+        const char* description;
+        int code = glfwGetError(&description);
+        std::cerr << "Failed to create GLFW window (error " << code << ": \"" << description << "\")" << ", you can launch SniffCraft without GUI with the --headless argument" << std::endl;
         glfwTerminate();
         return;
     }
