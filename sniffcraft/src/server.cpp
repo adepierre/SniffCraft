@@ -295,9 +295,6 @@ void Server::Render()
         return;
     }
 
-    const float main_scale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
-    glfwSetWindowSize(window, base_window_width * main_scale, base_window_height * main_scale);
-
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
@@ -329,12 +326,15 @@ void Server::Render()
     ImGui::GetIO().IniFilename = NULL;
     ImGui::GetIO().LogFilename = NULL;
 
-    ImGui::GetStyle().ScaleAllSizes(main_scale);
-    ImGui::GetStyle().FontScaleDpi = main_scale;
-
     // Setup platform/renderer
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    const float main_scale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
+    glfwSetWindowSize(window, base_window_width * main_scale, base_window_height * main_scale);
+
+    ImGui::GetStyle().ScaleAllSizes(main_scale);
+    ImGui::GetStyle().FontScaleDpi = main_scale;
 
     InternalRenderLoop(window);
 
