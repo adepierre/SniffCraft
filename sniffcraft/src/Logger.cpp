@@ -411,7 +411,7 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
                         ImGui::TableSetColumnIndex(column);
                         if (column == 0)
                         {
-                            ImGui::Text("%010d", row * 8);
+                            ImGui::Text("%010i", row * 8);
                         }
                         else if (column == 9)
                         {
