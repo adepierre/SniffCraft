@@ -411,7 +411,7 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
                         ImGui::TableSetColumnIndex(column);
                         if (column == 0)
                         {
-                            ImGui::Text("%010s", std::to_string(row * 8).c_str());
+                            ImGui::Text("%010d", row * 8);
                         }
                         else if (column == 9)
                         {
@@ -457,7 +457,7 @@ std::tuple<std::shared_ptr<Packet>, ConnectionState, Endpoint> Logger::Render()
                                     const std::string tooltip = GetJsonPath(selected_json, index_offset);
                                     if (!tooltip.empty())
                                     {
-                                        ImGui::SetTooltip(tooltip.c_str());
+                                        ImGui::SetTooltip("%s", tooltip.c_str());
                                     }
                                 }
                             }
