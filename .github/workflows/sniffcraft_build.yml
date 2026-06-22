@@ -20,7 +20,7 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CMAKE_GENERATOR: ${{ inputs.os == 'windows-latest' && 'Visual Studio 17 2022' || 'Unix Makefiles' }}
+  CMAKE_GENERATOR: ${{ inputs.os == 'windows-latest' && 'Visual Studio 18 2026' || 'Unix Makefiles' }}
   VERSION: ${{ inputs.version }}
   ISSUE_URL: ${{ inputs.issue }}
 
