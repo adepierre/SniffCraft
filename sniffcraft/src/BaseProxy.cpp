@@ -40,6 +40,22 @@ std::optional<std::string> BaseProxy::Start(const std::string& server_address, c
 
     asio::connect(server_connection.GetSocket(), results, ec);
 
+    const auto enable_tcp_nodelay = [](Connection &connection, const std::string &endpoint) -> std::optional<std::string> {
+        asio::error_code option_ec;
+        connection.GetSocket().set_option(asio::ip::tcp::no_delay(true), option_ec);
+        if (option_ec) {
+            return "Error enabling TCP_NODELAY on the " + endpoint + " connection: " + option_ec.message();
+        }
+        return std::nullopt;
+    };
+
+    if (auto option_error = enable_tcp_nodelay(client_connection, "client-facing"); option_error.has_value()) {
+        std::cerr << *option_error << std::endl;
+    }
+    if (auto option_error = enable_tcp_nodelay(server_connection, "server-facing"); option_error.has_value()) {
+        std::cerr << *option_error << std::endl;
+    }
+
     if (ec)
     {
         Close();
