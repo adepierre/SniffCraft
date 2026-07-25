@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is_valid_request: ${{ steps.check.outputs.is_valid_request }}
+      is_valid_version: ${{ steps.check.outputs.is_valid_version }}
       version: ${{ steps.retrieve.outputs.version }}
       value: ${{ steps.exist.outputs.value }}
     steps:
@@ -24,15 +25,24 @@ jobs:
         if: ${{ steps.check.outputs.is_valid_request == 'true' }}
         env:
           BODY: ${{ github.event.issue.body }}
-        run: echo "version="$(echo "$BODY" | tail -n1) >> $GITHUB_OUTPUT
+        run: |
+          VERSION="$(echo "$BODY" | tail -n1 | tr -d '\r')"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is_valid_version=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_valid_version=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - id: exist
         name: Check if version already exists in release
-        if: ${{ steps.check.outputs.is_valid_request == 'true' }}
-        run: echo "value="$(gh release view latest --repo ${{ github.repository }} --json assets -q "[.assets.[].name | select(endswith(\"${{ steps.retrieve.outputs.version }}\"))] | length") >> $GITHUB_OUTPUT
+        if: ${{ steps.check.outputs.is_valid_request == 'true' && steps.retrieve.outputs.is_valid_version == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
-
+          VERSION: ${{ steps.retrieve.outputs.version }}
+        run: |
+          COUNT="$(gh release view latest --repo "${{ github.repository }}" --json assets -q "[.assets[].name | select(endswith(\"$VERSION\"))] | length")"
+          echo "value=$COUNT" >> "$GITHUB_OUTPUT"
 
   os_matrix:
     needs: check_if_build_needed
@@ -68,20 +78,31 @@ jobs:
     if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value == 0 }}
     steps:
       - name: Notify issue
-        run: gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. You can follow the build progress [here](https://github.com/${{ github.repository }}/actions) or subscribe to this issue to be notified when binaries are ready."
         env:
           GH_TOKEN: ${{ github.token }}
+        run: gh issue comment ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -b "Build process started. You can follow the build progress [here](https://github.com/${{ github.repository }}/actions) or subscribe to this issue to be notified when binaries are ready."
 
 
   notify_already_exists:
     runs-on: ubuntu-latest
     needs: check_if_build_needed
-    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value != 0 }}
+    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.is_valid_version == 'true' && needs.check_if_build_needed.outputs.value != 0 }}
     steps:
       - name: Notify and close issue
-        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "Binaries for ${{ needs.check_if_build_needed.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." -r "duplicate"
         env:
           GH_TOKEN: ${{ github.token }}
+        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "Binaries for ${{ needs.check_if_build_needed.outputs.version }} are already available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest)." -r "duplicate"
+
+
+  notify_invalid_version:
+    runs-on: ubuntu-latest
+    needs: check_if_build_needed
+    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.is_valid_version == 'false' }}
+    steps:
+      - name: Notify and close issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "The version in this request doesn't match the expected format (e.g. \`1.21.11\`). Please use the version request template to create your issue." -r "not planned"
 
 
   update_release:
@@ -116,16 +137,16 @@ jobs:
           mv macos/sniffcraft sniffcraft-macos-${{ needs.check_if_build_needed.outputs.version }}
 
       - name: Upload files to release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: >
           gh release upload latest
           sniffcraft-linux-${{ needs.check_if_build_needed.outputs.version }}
           sniffcraft-windows-${{ needs.check_if_build_needed.outputs.version }}.exe
           sniffcraft-macos-${{ needs.check_if_build_needed.outputs.version }}
           --repo ${{ github.repository }}
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: Close associated issue
-        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ needs.check_if_build_needed.outputs.version }}" -r "completed"
         env:
           GH_TOKEN: ${{ github.token }}
+        run: gh issue close ${{ github.event.issue.html_url }} --repo ${{ github.repository }} -c "New binaries available in the [latest release](https://github.com/${{ github.repository }}/releases/tag/latest) for version ${{ needs.check_if_build_needed.outputs.version }}" -r "completed"
