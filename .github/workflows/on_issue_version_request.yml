@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is_valid_request: ${{ steps.check.outputs.is_valid_request }}
-      is_valid_version: ${{ steps.check.outputs.is_valid_version }}
+      is_valid_version: ${{ steps.retrieve.outputs.is_valid_version }}
       version: ${{ steps.retrieve.outputs.version }}
       value: ${{ steps.exist.outputs.value }}
     steps:
@@ -47,7 +47,7 @@ jobs:
   os_matrix:
     needs: check_if_build_needed
     name: ${{ matrix.config.name }}
-    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.value == 0 }}
+    if: ${{ needs.check_if_build_needed.outputs.is_valid_request == 'true' && needs.check_if_build_needed.outputs.is_valid_version == 'true' && needs.check_if_build_needed.outputs.value == 0 }}
     secrets: inherit
     strategy:
       fail-fast: false
