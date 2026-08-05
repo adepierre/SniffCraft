@@ -1,11 +1,12 @@
 #pragma once
 
-#include <functional>
-#include <vector>
-#include <thread>
 #include <atomic>
-#include <memory>
 #include <deque>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 #include <asio.hpp>
 
@@ -83,4 +84,7 @@ private:
 
 	/// @brief Optional DataProcessor applied to all incoming and outgoing data
 	std::unique_ptr<DataProcessor> data_processor;
+	/// @brief Mutex protecting data_processor. Used in three threads calling handle_read, WriteData/WriteLoop and SetDataProcessor
+	std::mutex data_processor_mutex;
+
 };

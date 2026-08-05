@@ -21,8 +21,8 @@ void Connection::SetCallback(const std::function<void(const size_t)>& callback)
 
 void Connection::SetDataProcessor(std::unique_ptr<DataProcessor>& processor)
 {
-    // Lock mutex to prevent any race condition issue in WriteData
-    std::lock_guard<std::mutex> write_lock(write_mutex);
+    // Lock mutex to prevent any race condition issue in WriteData, WriteLoop and handle_read
+    std::lock_guard<std::mutex> processor_lock(data_processor_mutex);
     data_processor = std::move(processor);
 }
 
@@ -53,7 +53,8 @@ void Connection::StartListeningAndWriting()
 void Connection::WriteData(const unsigned char* const data, const size_t length)
 {
     {
-        std::lock_guard<std::mutex> write_lock(write_mutex);
+        // Lock both mutexes without deadlock
+        std::scoped_lock<std::mutex, std::mutex> data_processor_lock(data_processor_mutex, write_mutex);
         data_to_write.push_back({ std::vector<unsigned char>(data, data + length), data_processor != nullptr });
     }
     write_cv.notify_one();
@@ -116,6 +117,9 @@ void Connection::WriteLoop()
             std::vector<unsigned char> processed_data;
             if (next_written.second)
             {
+                // If next_written.second is true it means data_processor is != nullptr so
+                // we don't really need the lock as it's never changed after creation
+                // std::lock_guard<std::mutex> data_processor_lock(data_processor_mutex);
                 processed_data = data_processor->ProcessOutgoingData(next_written.first);
                 data_ptr = processed_data.data();
                 data_length = processed_data.size();
@@ -149,11 +153,14 @@ void Connection::handle_read(const asio::error_code& ec, const size_t bytes_tran
     size_t length = bytes_transferred;
 
     std::vector<unsigned char> processed_data;
-    if (data_processor != nullptr)
     {
-        processed_data = data_processor->ProcessIncomingData({ data->begin(), data->begin() + length });
-        data = &processed_data;
-        length = processed_data.size();
+        std::lock_guard<std::mutex> data_processor_lock(data_processor_mutex);
+        if (data_processor != nullptr)
+        {
+            processed_data = data_processor->ProcessIncomingData({ data->begin(), data->begin() + length });
+            data = &processed_data;
+            length = processed_data.size();
+        }
     }
 
     {
