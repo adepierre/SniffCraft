@@ -1,4 +1,6 @@
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include <protocolCraft/BinaryReadWrite.hpp>
 #include <protocolCraft/PacketFactory.hpp>
@@ -403,6 +405,10 @@ void MinecraftProxy::Handle(ClientboundHelloPacket& packet)
     // Set the encrypter for any future message from the server
     std::unique_ptr<DataProcessor> encryption_data_processor = std::make_unique<MinecraftEncryptionDataProcessor>(encrypter);
     server_connection.SetDataProcessor(encryption_data_processor);
+
+    // Dirty trick to increase the chances the key packet is not sent packed with the next packet in the TCP connection
+    // This prevents the server to load the next packet bytes before this packet is processed and decryption is enabled
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 #else
     std::cerr << "WARNING, trying to connect to a server with encryption enabled\n" <<
