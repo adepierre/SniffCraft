@@ -27,7 +27,7 @@ jobs:
           BODY: ${{ github.event.issue.body }}
         run: |
           VERSION="$(echo "$BODY" | tail -n1 | tr -d '\r')"
-          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "is_valid_version=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_valid_version=false" >> "$GITHUB_OUTPUT"
